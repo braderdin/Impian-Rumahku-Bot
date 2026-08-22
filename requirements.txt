@@ -5,7 +5,7 @@ urllib3>=2.7.0
 certifi
 charset-normalizer>=3.3.0
 idna>=3.7
-six>=1.16.0
+six>=1.17.0
 
 # Video & Audio Engine (Reels & Story Stitching)
 moviepy>=2.2.1
