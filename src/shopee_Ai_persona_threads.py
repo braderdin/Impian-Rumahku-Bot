@@ -7,6 +7,7 @@ Features:
 - Natural Malaysian homemaker storytelling (Mama persona, no stiff translations)
 - Dynamic Active Token: Reads Redis 'auth:impianrumahku:threads_token' first, fallback to .env
 - Private Ephemeral B2 Hosting: Uploads temp image -> Generates Signed URL (600s) -> Posts -> Deletes from B2
+- Enhanced B2 Resilience: 3x Upload & Pod Re-fetch Retry Loop
 - 2-Stage Threads Media Container creation & status polling
 - Hard safety cap: <= 490 characters total (Threads 500 limit)
 - 100% Code-Locked Affiliate Link and Product Price
@@ -173,6 +174,7 @@ def b2_authorize(key_id: str, app_key: str) -> Tuple[bool, str, str, str, str]:
 def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str, str, str, str]:
     """
     Memuat naik fail gambar tempatan ke Private B2 Bucket dan menjana Signed URL (600s).
+    Dilengkapi gelung 3x percubaan bagi mengatasi ralat pod connection timeout.
     """
     if not image_path or not os.path.exists(image_path):
         return False, "", "", "", "", "", "Fail imej fizikal tidak wujud untuk dimuat naik ke B2."
@@ -196,39 +198,56 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
                     bucket_id = b.get("bucketId")
                     break
 
-    # 2. Get Upload URL
-    get_up_url = f"{api_url}/b2api/v2/b2_get_upload_url"
-    up_res = requests.post(get_up_url, json={"bucketId": bucket_id}, headers={"Authorization": auth_token}, timeout=20)
-    if up_res.status_code != 200:
-        return False, "", "", "", "", "", f"Gagal mendapatkan B2 Upload URL: {up_res.text}"
-
-    up_data = up_res.json()
-    upload_url = up_data.get("uploadUrl")
-    upload_auth = up_data.get("authorizationToken")
-
-    # 3. Upload Binary
     file_name = f"threads_ephemeral_{int(time.time())}_{os.path.basename(image_path)}"
     encoded_file_name = urllib.parse.quote(file_name)
 
     with open(image_path, "rb") as f:
         file_bytes = f.read()
 
-    headers = {
-        "Authorization": upload_auth,
-        "X-Bz-File-Name": encoded_file_name,
-        "Content-Type": "image/jpeg",
-        "X-Bz-Content-Sha1": hashlib.sha1(file_bytes).hexdigest(),
-        "Content-Length": str(len(file_bytes)),
-    }
+    sha1_hash = hashlib.sha1(file_bytes).hexdigest()
+    file_id = None
+    upload_err_msg = ""
 
+    # 2. Gelung 3x Percubaan Muat Naik dengan Permintaan Pod Baharu
+    for attempt in range(1, 4):
+        get_up_url = f"{api_url}/b2api/v2/b2_get_upload_url"
+        try:
+            up_res = requests.post(get_up_url, json={"bucketId": bucket_id}, headers={"Authorization": auth_token}, timeout=20)
+            if up_res.status_code != 200:
+                upload_err_msg = f"Gagal mendapatkan B2 Upload URL: {up_res.text}"
+                time.sleep(2)
+                continue
+
+            up_data = up_res.json()
+            upload_url = up_data.get("uploadUrl")
+            upload_auth = up_data.get("authorizationToken")
+
+            headers = {
+                "Authorization": upload_auth,
+                "X-Bz-File-Name": encoded_file_name,
+                "Content-Type": "image/jpeg",
+                "X-Bz-Content-Sha1": sha1_hash,
+                "Content-Length": str(len(file_bytes)),
+            }
+
+            upload_post = requests.post(upload_url, data=file_bytes, headers=headers, timeout=(10, 40))
+            if upload_post.status_code == 200:
+                file_id = upload_post.json().get("fileId")
+                break
+            else:
+                upload_err_msg = f"HTTP {upload_post.status_code}: {upload_post.text}"
+        except requests.exceptions.RequestException as e:
+            upload_err_msg = f"Ralat rangkaian B2: {e}"
+
+        if attempt < 3:
+            print(f"   ⚠️ [B2 RETRY] Percubaan {attempt}/3 gagal ({upload_err_msg[:60]}...). Meminta pod baharu...")
+            time.sleep(2)
+
+    if not file_id:
+        return False, "", "", "", "", "", f"Gagal muat naik ke B2 selepas 3 percubaan: {upload_err_msg}"
+
+    # 3. Jana Signed Download Authorization Token (Sah 600 saat)
     try:
-        upload_post = requests.post(upload_url, data=file_bytes, headers=headers, timeout=40)
-        if upload_post.status_code != 200:
-            return False, "", "", "", "", "", f"Gagal upload ke B2 (HTTP {upload_post.status_code}): {upload_post.text}"
-
-        file_id = upload_post.json().get("fileId")
-
-        # 4. Jana Signed Download Authorization Token (Sah 600 saat)
         down_auth_url = f"{api_url}/b2api/v2/b2_get_download_authorization"
         down_payload = {
             "bucketId": bucket_id,
@@ -247,7 +266,7 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
             return False, "", "", "", "", "", f"Gagal menjana B2 Signed Token: {down_res.text}"
 
     except Exception as e:
-        return False, "", "", "", "", "", f"Ralat muat naik B2: {e}"
+        return False, "", "", "", "", "", f"Ralat penjanaan token B2: {e}"
 
 
 def delete_ephemeral_image_from_b2(api_url: str, auth_token: str, file_id: str, file_name: str) -> bool:
@@ -362,6 +381,7 @@ def generate_fallback_threads_story(product_name: str) -> str:
 def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
     """
     Menjana penceritaan santai Bahasa Melayu khas untuk Threads dengan nada Mama semula jadi.
+    Menggunakan rujukan visual ringkas untuk mengekalkan beban inferens yang ringan.
     """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title(raw_name, max_len=30)
@@ -377,7 +397,6 @@ def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
         "Content-Type": "application/json",
     }
 
-    # Prompt Mama Santai & Natural (Menyekat terjemahan kaku "Saya melihat...")
     system_prompt = (
         "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra dan suka bercerita santai.\n"
         "Tugasan: Tulis 1 atau 2 ayat ulasan santai bersahaja suri rumah dalam BAHASA MELAYU MALAYSIA TULEN.\n\n"
@@ -464,14 +483,10 @@ def post_to_threads_api(
     caption: str
 ) -> Tuple[bool, Dict[str, Any], str]:
     """
-    Menerbitkan hantaran bergambar ke Threads melalui Meta Graph API:
-    1. Cipta Media Container (media_type=IMAGE)
-    2. Semak status container (Status: FINISHED)
-    3. Terbitkan Media Container ke Threads Feed
+    Menerbitkan hantaran bergambar ke Threads melalui Meta Graph API.
     """
     base_threads_url = f"https://graph.threads.net/v1.0/{user_id}"
 
-    # 1. Cipta Container Media
     create_url = f"{base_threads_url}/threads"
     create_payload = {
         "media_type": "IMAGE",
@@ -489,7 +504,6 @@ def post_to_threads_api(
         container_id = c_res.json().get("id")
         print(f"   ✅ Container dicipta (ID: {container_id}). Menunggu pemprosesan imej Meta...")
 
-        # 2. Polling Status Container (Maksimum 6 percubaan, sela 3 saat)
         status_url = f"https://graph.threads.net/v1.0/{container_id}"
         is_ready = False
 
@@ -509,7 +523,6 @@ def post_to_threads_api(
         if not is_ready:
             print("   ⚠️ Amaran masa tamat status, mencuba terbit terus...")
 
-        # 3. Terbitkan Container
         publish_url = f"{base_threads_url}/threads_publish"
         pub_payload = {
             "creation_id": container_id,
@@ -529,12 +542,7 @@ def post_to_threads_api(
 
 def run_threads_pipeline() -> Tuple[bool, str]:
     """
-    Fungsi Pengendali Utama Modul Threads:
-    1. Membaca temp/shopee_vision_ocr.json
-    2. Upload imej ke Backblaze B2 (Private Signed URL 600s)
-    3. Jana penceritaan santai Mama (<= 490 aksara)
-    4. Pos ke Threads API
-    5. Padam imej daripada B2 Storage serta-merta
+    Fungsi Pengendali Utama Modul Threads.
     """
     if not INPUT_JSON_FILE.exists():
         return False, f"Fail input {INPUT_JSON_FILE.name} tidak ditemui dalam folder temp/."
@@ -546,7 +554,6 @@ def run_threads_pipeline() -> Tuple[bool, str]:
     with open(INPUT_JSON_FILE, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
-    # 1. Pengehosan Imej ke Backblaze B2 (Signed URL)
     local_img = payload.get("local_image_path", "")
     print(f"\n🚀 [THREADS PIPELINE] Memulakan muat naik imej sementara ke Backblaze B2 (Signed Mode)...")
     b2_ok, b2_signed_url, b2_file_id, b2_file_name, b2_api_url, b2_auth_token, b2_err = upload_temp_image_to_b2_signed(local_img)
@@ -557,7 +564,6 @@ def run_threads_pipeline() -> Tuple[bool, str]:
     post_msg = ""
 
     try:
-        # 2. Bina Ayat Persona Mama
         story_bm = generate_mama_threads_copy(payload)
         final_caption = assemble_threads_post(payload, story_bm)
 
@@ -569,7 +575,6 @@ def run_threads_pipeline() -> Tuple[bool, str]:
         print(f"📏 Jumlah Aksara: {len(final_caption)} / 500 aksara")
         print("=" * 70)
 
-        # 3. Terbitkan ke Threads API
         print(f"\n📡 Menghantar hantaran ke akaun Threads (User ID: {user_id})...")
         post_ok, post_info, post_msg = post_to_threads_api(
             user_id=user_id,
@@ -579,7 +584,6 @@ def run_threads_pipeline() -> Tuple[bool, str]:
         )
 
     finally:
-        # 4. Pembersihan Ephemeral: Padam fail dari B2 Storage serta-merta
         print("\n🧹 [CLEANUP] Membersihkan fail imej sementara dari Backblaze B2...")
         delete_ephemeral_image_from_b2(b2_api_url, b2_auth_token, b2_file_id, b2_file_name)
 
