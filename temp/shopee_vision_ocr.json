@@ -1,0 +1,34 @@
+{
+  "step": 2,
+  "shopee_product_id": "3643564730",
+  "shopee_product_name": "Cleaning🧽 Plastik Beg Automatic Closing Tie On Drawstring Garbage Bag Bags With Rope Easy Pull Portable Dustbin 抽绳垃圾袋",
+  "shopee_brand": "ATP Professional Business Solution",
+  "shopee_price": 1.2,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/sg-11134201-82607-mjdhls7ycttw11",
+  "shopee_affiliate_link": "https://s.shopee.com.my/1Vyc4gQUNt",
+  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_3643564730.jpg",
+  "mama_english_review": "A sleek mesh waste bin showcases a bright orangeâtied drawstring bag, while four vivid rollsâblue, red, yellow, blackâpromise colorâcoded organization. The sturdy plastic ties seal automatically, keeping odors contained, and the portable, easyâpull design fits any kitchen, office or bathroom dustbin for tidy, hassleâfree cleaning.",
+  "review_char_count": 332,
+  "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "post_results": {
+    "facebook": {
+      "status": "pending"
+    },
+    "threads": {
+      "status": "pending"
+    },
+    "instagram": {
+      "status": "pending"
+    },
+    "bluesky": {
+      "status": "pending"
+    }
+  },
+  "ai_captions": {
+    "facebook": "",
+    "threads": "",
+    "instagram": "",
+    "bluesky": ""
+  },
+  "created_at": "2026-08-24 06:59:45"
+}

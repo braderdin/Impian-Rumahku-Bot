@@ -1,0 +1,43 @@
+{
+  "step": 2,
+  "shopee_product_id": "3643564730",
+  "shopee_product_name": "Cleaning🧽 Plastik Beg Automatic Closing Tie On Drawstring Garbage Bag Bags With Rope Easy Pull Portable Dustbin 抽绳垃圾袋",
+  "shopee_brand": "ATP Professional Business Solution",
+  "shopee_price": 1.2,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/sg-11134201-82607-mjdhls7ycttw11",
+  "shopee_affiliate_link": "https://s.shopee.com.my/1Vyc4gQUNt",
+  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_3643564730.jpg",
+  "mama_english_review": "A sleek mesh waste bin showcases a bright orangeâtied drawstring bag, while four vivid rollsâblue, red, yellow, blackâpromise colorâcoded organization. The sturdy plastic ties seal automatically, keeping odors contained, and the portable, easyâpull design fits any kitchen, office or bathroom dustbin for tidy, hassleâfree cleaning.",
+  "review_char_count": 332,
+  "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "post_results": {
+    "facebook": {
+      "status": "success",
+      "post_id": "1353740547811893_122100156135450068",
+      "photo_id": "122100156111450068",
+      "char_count": 521
+    },
+    "threads": {
+      "status": "success",
+      "thread_id": "18123058750839415",
+      "char_count": 281
+    },
+    "instagram": {
+      "status": "success",
+      "media_id": "18144775903507364",
+      "char_count": 545
+    },
+    "bluesky": {
+      "status": "success",
+      "uri": "at://did:plc:nrwxc2ntoi3fmj3ihzbgroge/app.bsky.feed.post/3mtrvk6l7l22m",
+      "char_count": 239
+    }
+  },
+  "ai_captions": {
+    "facebook": "✨ Cleaning🧽 Plastik Beg Automatic Closing Tie On Draws...\n\nMama nak kongsi beg sampah dengan tali pengikat yang tertutup secara automatik, direka kemas dengan empat warna terang iaitu biru, merah, kuning dan hitam. Tali boleh ditarik dengan mudah, bau tidak menyebar, sesuai untuk dapur, pejabat atau bilik mandi. Ia ringkas dan portabel, mudah dibawa.\n\n💰 Harga Mesra Poket: RM1.20\n📌 Mama dah letak link barang ni di ruangan komen pertama di bawah ya! 👇\n\n#ImpianRumahku #CeritaMama #KemasRumah #TipsSuriRumah #RacunShopee",
+    "threads": "✨ Cleaning🧽 Plastik Beg\n\nMama suka betul dengan beg plastik ini, warna oren terang dan tali drawstring yang mudah ditarik, bikin bersih-bersih jadi senang dan cepat.\n\n💰 Harga: RM1.20\n🛒 Shopee: https://s.shopee.com.my/1Vyc4gQUNt\n\n\n#ImpianRumahku #CeritaMama #KemasRumah #RacunShopee",
+    "instagram": "✨ Cleaning🧽 Plastik Beg Automatic\n\nMama suka betul dengan plastik beg sampah ni, warnanya yang pelbagai dan cerah sangat membantu Mama nak kenal pasti sampah yang mana perlu dibuang di tempat yang betul, jadi rumah sentiasa kemas dan teratur. Plastiknya nipis tapi kuat sangat, senang sangat Mama guna untuk ikat dan buang, memang sesuai untuk kegunaan harian di rumah.\n\n💰 Harga: RM1.20\n🛒 Link Shopee: https://s.shopee.com.my/1Vyc4gQUNt\n\n#ImpianRumahku #CeritaMama #KemasRumah #DekoRumah #DekoDapur #RacunShopee #TipsSuriRumah #HomeDecorMalaysia",
+    "bluesky": "✨ Cleaning🧽 Plastik Beg\n\nBeg plastik ini dirancang dengan ruang yang luas dan penutup yang ketat, memudahkan anda menyimpan alat pembersih secara kemas dan mengelakkan bau tidak sedap.\n\n💰 RM1.20\n🛒 Shopee: https://s.shopee.com.my/1Vyc4gQUNt"
+  },
+  "created_at": "2026-08-24 06:59:45"
+}

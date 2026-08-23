@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Shopee Vision & Mama English Persona Review Engine (Lightweight & Anti-Hang Edition)
+Shopee Vision & Mama English Persona Review Engine (Chic & Lightweight Edition)
 Impian Rumahku Ecosystem (Step 2 Pipeline)
 Features:
-- Compresses and resizes product images with Pillow (under 80KB) before Base64 encoding
-- Ultra-lightweight payload to prevent OpenRouter/Cloudflare socket stalls
-- Strict Socket Timeout: timeout=(8, 25) to trigger fast fallback instead of hanging
-- Persona: "Mama" English (warm, observant homemaker storytelling, 400 - 700 chars)
-- 3x Retry mechanism with 2-second delay per attempt
+- Encodes compressed JPEG image (<60KB) to prevent socket timeouts
+- Persona: Educated 30-something English lifestyle creator (sharp, versatile insights)
+- Strict character limit: strictly <= 500 characters total
+- Mojibake & Glitch Scrubber: cleans corrupted UTF-8 byte encodings
+- Removes max_tokens constraint from request payload
+- 3x Retry mechanism with strict socket timeout (8s, 25s)
 - 100% Code-Locked: shopee_affiliate_link & shopee_price remain immutable
-- Saves structured payload to temp/shopee_vision_ocr.json and syncs temp/shopee_payload.json
+- Saves structured payload to temp/shopee_vision_ocr.json & temp/shopee_payload.json
 """
 
 import os
@@ -68,17 +69,43 @@ def get_vision_config() -> Tuple[Optional[str], Optional[str], Optional[str], st
     return endpoint_url, api_key, vision_model, ""
 
 
-def clean_thinking_output(text: str) -> str:
+def clean_and_scrub_vision_text(text: str) -> str:
     """
-    Membuang sebarang tag pemikiran dalaman model AI (<think>...</think>)
-    serta format markdown tambahan supaya teks ulasan kekal bersih.
+    Membersihkan tag pemikiran, ralat simbol mojibake, dan mengehadkan teks <= 500 aksara.
     """
     if not text:
         return ""
+
+    # 1. Buang tag pemikiran AI & kod markdown
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     cleaned = re.sub(r"```json\s*", "", cleaned)
     cleaned = re.sub(r"```\s*", "", cleaned)
-    return cleaned.strip().strip('"').strip("'")
+
+    # 2. Rawat simbol rosak (Mojibake & Glitch Encodings)
+    replacements = {
+        "Ã©": "e", "Ã¨": "e", "Ã ": "a", "Ã¡": "a", "Ã±": "n",
+        "â€™": "'", "â€˜": "'", "â€œ": '"', "â€": '"',
+        "â€‘": "-", "â€”": "-", "â€“": "-", "â€¦": "...",
+        "’": "'", "‘": "'", "“": '"', "”": '"',
+        "—": "-", "–": "-", "…": "...", "\xa0": " ",
+    }
+    for orig, rep in replacements.items():
+        cleaned = cleaned.replace(orig, rep)
+
+    # 3. Buang sebarang simbol kawalan yang tidak standard
+    cleaned = re.sub(r"[\x80-\x9f]", "", cleaned)
+    cleaned = cleaned.strip().strip('"').strip("'")
+
+    # 4. Kawalan Had Keras: Maksimum 500 aksara (Potong pada tanda noktah terakhir)
+    if len(cleaned) > 500:
+        trimmed = cleaned[:500]
+        match = re.search(r"^([\s\S]*[.!?])", trimmed)
+        if match:
+            cleaned = match.group(1).strip()
+        else:
+            cleaned = trimmed.rstrip() + "..."
+
+    return cleaned
 
 
 def download_temp_image(image_url: str, product_id: str) -> Tuple[bool, str, str]:
@@ -111,8 +138,7 @@ def download_temp_image(image_url: str, product_id: str) -> Tuple[bool, str, str
 
 def compress_and_encode_image(file_path: str, max_size: int = 512, quality: int = 75) -> Optional[str]:
     """
-    Mengecilkan dimensi dan memampatkan imej ke Base64 (~50KB - 80KB)
-    untuk mengelakkan sekatan masa (timeout/hang) pada pelayan OpenRouter.
+    Mengecilkan resolusi dan memampatkan imej ke Base64 (~40KB - 60KB).
     """
     try:
         with Image.open(file_path) as img:
@@ -136,14 +162,12 @@ def compress_and_encode_image(file_path: str, max_size: int = 512, quality: int 
 
 def generate_fallback_mama_english(product_name: str, brand: str, price: float) -> str:
     """
-    Menjana ulasan Bahasa Inggeris persona Mama secara automatik
-    sekiranya panggilan Vision API gagal selepas 3 percubaan.
+    Ulasan sandaran Bahasa Inggeris bergaya dan ringkas jika Vision API gagal.
     """
     return (
-        f"Mama really loves how practical this {product_name[:45]} from {brand} looks for our daily home routine! "
-        f"The neat design and sturdy build make it so easy to keep our living space tidy without any hassle. "
-        f"At only RM{price:.2f}, it is super budget-friendly for the family, lightweight to handle, and fits right "
-        f"into any cozy corner of the house. A must-have little helper for busy moms!"
+        f"I really admire the thoughtful design and versatile utility of this {product_name[:40]} from {brand}. "
+        f"It effortlessly combines practical everyday functionality with a clean, modern aesthetic. "
+        f"At only RM{price:.2f}, it is a delightful and budget-friendly upgrade for keeping spaces tidy and organized."
     ).strip()
 
 
@@ -153,13 +177,8 @@ def analyze_product_image_with_vision(
     delay_seconds: int = 2
 ) -> Dict[str, Any]:
     """
-    Langkah 2: Persona Mama English Vision
-    - Meneliti gambar sebenar, nama, dan harga produk.
-    - Menjana ulasan santai suri rumah (400-700 aksara) dalam Bahasa Inggeris.
-    - Mengunci pautan affiliate & harga secara mutlak.
-    - Menyimpan payload ke temp/shopee_vision_ocr.json & temp/shopee_payload.json.
+    Step 2: Enjin Vision Persona Wanita English Terpelajar (Maksimum 500 aksara).
     """
-    # 1. Kunci Data Asal (Immutability Lock)
     product_id = str(product.get("shopee_product_id") or product.get("product_id") or "").strip()
     product_name = str(product.get("shopee_product_name") or product.get("product_name") or "").strip()
     product_brand = str(product.get("shopee_brand") or product.get("brand") or "Shopee Preferred").strip()
@@ -167,11 +186,11 @@ def analyze_product_image_with_vision(
     picture_url = str(product.get("shopee_picture_url") or product.get("picture_url") or "").strip()
     locked_affiliate_link = str(product.get("shopee_affiliate_link") or product.get("affiliate_link") or "").strip()
 
-    print(f"\n🖼️ [STEP 2: MAMA VISION EN] Memulakan ulasan visual untuk ID: {product_id}...")
+    print(f"\n🖼️ [STEP 2: VISION PROMOTION REVIEW] Memulakan ulasan visual untuk ID: {product_id}...")
     print(f"   📦 Produk: {product_name[:60]}...")
     print(f"   💰 Harga Terkunci: RM{locked_price:.2f}")
 
-    # 2. Muat turun imej dan mampatkan ke Base64 ringan
+    # 1. Muat turun imej dan mampatkan ke Base64 ringan
     dl_ok, local_img_path, dl_err = download_temp_image(picture_url, product_id)
     base64_image = compress_and_encode_image(local_img_path) if dl_ok else None
 
@@ -187,26 +206,29 @@ def analyze_product_image_with_vision(
             "Content-Type": "application/json",
         }
 
+        # Prompt Persona Wanita Terpelajar 30-an (Fokus Visual & Kepelbagaian Kegunaan)
         system_prompt = (
-            "You are 'Mama' from 'Impian Rumahku & Cerita Mama' — a warm, observant, and relatable homemaker.\n"
-            "Look closely at the product photo along with its name and price, then write a cozy visual review in ENGLISH.\n"
-            "Describe the visual details (colors, shape, practical household usage, cleaning, organizing).\n\n"
-            "STRICT CONSTRAINTS:\n"
-            "1. Write strictly in ENGLISH from Mama's perspective.\n"
-            "2. Total review length MUST be between 400 and 700 characters (including spaces).\n"
-            "3. Focus on genuine homemaker storytelling, visual details, and practical home value.\n"
-            "4. NEVER mention URLs, affiliate links, hashtags, or markdown formatting.\n"
-            "5. Return ONLY the review paragraph without thinking tags (<think>)."
+            "You are an articulate, educated 30-something English lifestyle creator and social media curator.\n"
+            "Your style is vibrant, clever, chic, and observant. You love sharing versatile home and lifestyle finds.\n\n"
+            "TASK:\n"
+            "Look closely at the product photo and title. Write a polished, engaging micro-review in ENGLISH.\n"
+            "Describe the visible aesthetic (colors, materials, form factor) and explain its versatile practical uses in daily living.\n\n"
+            "STRICT RULES:\n"
+            "1. Write strictly in natural, eloquent ENGLISH.\n"
+            "2. Total length MUST be between 250 and 500 characters.\n"
+            "3. Focus on real visual details and smart versatile utility.\n"
+            "4. NEVER include URLs, affiliate links, hashtags, emojis, or conversational intros.\n"
+            "5. Return ONLY the review paragraph with clean punctuation."
         )
 
         user_content = [
             {
                 "type": "text",
                 "text": (
-                    f"Product Name: {product_name}\n"
+                    f"Product Title: {product_name}\n"
                     f"Brand: {product_brand}\n"
                     f"Price: RM{locked_price:.2f}\n\n"
-                    f"Write Mama's visual review in English (strictly 400 to 700 characters):"
+                    f"Write your versatile visual review in English (strictly under 500 characters):"
                 ),
             },
             {
@@ -215,31 +237,30 @@ def analyze_product_image_with_vision(
             },
         ]
 
+        # Payload ringan tanpa had max_tokens manual
         payload = {
             "model": model_name,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
             ],
-            "max_tokens": 400,
             "temperature": 0.35,
         }
 
         for attempt in range(1, max_attempts + 1):
-            print(f"   📡 [Mama Vision Attempt {attempt}/{max_attempts}] Menghantar ke model: {model_name}...")
+            print(f"   📡 [Vision Attempt {attempt}/{max_attempts}] Menghantar ke model: {model_name}...")
             try:
-                # Timeout ketat (8s connect, 25s read) mengelakkan terminal jem
                 res = requests.post(endpoint_url, headers=headers, json=payload, timeout=(8, 25))
                 if res.status_code == 200:
                     res_json = res.json()
                     raw_text = res_json.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    clean_text = clean_thinking_output(raw_text)
+                    clean_text = clean_and_scrub_vision_text(raw_text)
 
-                    if len(clean_text) >= 280:
+                    if len(clean_text) >= 180:
                         mama_english_review = clean_text
                         used_model = model_name
                         is_fallback = False
-                        print(f"   ✅ [Mama Vision Berjaya] Ulasan dijana ({len(mama_english_review)} aksara): \"{mama_english_review[:65]}...\"")
+                        print(f"   ✅ [Vision Berjaya] Ulasan dijana ({len(mama_english_review)} aksara): \"{mama_english_review[:65]}...\"")
                         break
                     else:
                         print(f"   ⚠️ [Ulasan Terlalu Pendek] ({len(clean_text)} aksara). Mencuba semula...")
@@ -248,14 +269,14 @@ def analyze_product_image_with_vision(
             except requests.exceptions.Timeout:
                 print(f"   ⚠️ [Vision Timeout ({attempt}/{max_attempts})] Sambungan tamat masa (8s/25s).")
             except Exception as e:
-                print(f"   ⚠️ [Vision Network Error ({attempt}/{max_attempts})]: {e}")
+                print(f"   ⚠️ [Vision Error ({attempt}/{max_attempts})]: {e}")
 
             if attempt < max_attempts:
                 time.sleep(delay_seconds)
 
-    # 3. Fallback automatik jika Vision API gagal
+    # 3. Fallback jika Vision gagal
     if not mama_english_review:
-        print("   🛡️ [FALLBACK AKTIF] Menggunakan ulasan sandaran Mama English asas.")
+        print("   🛡️ [FALLBACK AKTIF] Menggunakan ulasan sandaran Bahasa Inggeris asas.")
         mama_english_review = generate_fallback_mama_english(product_name, product_brand, locked_price)
 
     # 4. Susun Payload Bersih
@@ -274,7 +295,7 @@ def analyze_product_image_with_vision(
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
     }
 
-    # 5. Simpan ke temp/shopee_vision_ocr.json
+    # 5. Simpan ke fail sementara temp/shopee_vision_ocr.json
     try:
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
         with open(OUTPUT_JSON_FILE, "w", encoding="utf-8") as f:
@@ -306,20 +327,20 @@ def analyze_product_image_with_vision(
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("🧪 [TEST RUN] Menguji Enjin Mama English Vision (Step 2)...")
+    print("🧪 [TEST RUN] Menguji Enjin Vision Persona (Step 2)...")
     print("=" * 70)
 
     sample_candidate = {
-        "shopee_product_id": "24182640092",
-        "shopee_product_name": "Garden Hose Holder Heavy Duty Wall-Mounted Water Hose Hanger",
-        "shopee_brand": "Docooler Official Shop",
-        "shopee_price": 43.04,
-        "shopee_picture_url": "https://down-my.img.susercontent.com/file/my-11134207-7r98r-lktq7786t0a623",
-        "shopee_affiliate_link": "https://s.shopee.com.my/7Acyp3ENUn",
+        "shopee_product_id": "22355433182",
+        "shopee_product_name": "Scentify Fabric Perfume Sparkling Fruite 370ml | 2X Long-Lasting",
+        "shopee_brand": "Wipro Unza Official Store",
+        "shopee_price": 9.50,
+        "shopee_picture_url": "https://down-my.img.susercontent.com/file/my-11134207-7rash-mam2t6c3p0rv4e",
+        "shopee_affiliate_link": "https://s.shopee.com.my/4VcDe9OWtV",
     }
 
     result = analyze_product_image_with_vision(sample_candidate, max_attempts=3, delay_seconds=2)
     print("\n📦 Hasil Payload JSON Siap (Pratonton):")
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    print(f"\n📏 Panjang Ulasan Mama English: {result.get('review_char_count')} aksara")
+    print(f"\n📏 Panjang Ulasan English: {result.get('review_char_count')} aksara (Maksimum 500)")
     print("=" * 70)

@@ -10,7 +10,7 @@ Workflow:
 - Step 5: Commits product ID to Upstash Redis (Key: 'shopee:product:<id>', TTL 30 Days).
 - Step 6: Upserts title embedding to Upstash Vector DB (ID: 'sp_<id>', 2-Day window).
 - Step 7: Updates Supabase record (shopee_status_used = true).
-- Step 8: Cleans up temporary payload and image files in temp/.
+- Step 8: Cleans up local temporary image files while preserving JSON payloads for repo tracking.
 """
 
 import sys
@@ -30,30 +30,13 @@ from src.shopee_supabase_db import mark_shopee_product_as_used
 
 TEMP_DIR = PROJECT_ROOT / "temp"
 PAYLOAD_FILE = TEMP_DIR / "shopee_payload.json"
-VISION_OCR_FILE = TEMP_DIR / "shopee_vision_ocr.json"
 
 
 def cleanup_temp_files(local_image_path: str = ""):
     """
-    Step 8: Memadam fail sementara payload dan imej fizikal selepas transaksi selesai.
+    Step 8: Memadam fail imej fizikal sahaja untuk menjimatkan storan,
+    sambil mengekalkan fail JSON payload untuk semakan kualiti di GitHub.
     """
-    # 1. Padam shopee_payload.json
-    try:
-        if PAYLOAD_FILE.exists():
-            PAYLOAD_FILE.unlink()
-            print(f"   🧹 [CLEANUP] Fail payload '{PAYLOAD_FILE.name}' berjaya dipadam.")
-    except Exception as e:
-        print(f"   ⚠️ [CLEANUP WARN] Gagal memadam payload: {e}")
-
-    # 2. Padam shopee_vision_ocr.json jika ada
-    try:
-        if VISION_OCR_FILE.exists():
-            VISION_OCR_FILE.unlink()
-            print(f"   🧹 [CLEANUP] Fail sync '{VISION_OCR_FILE.name}' berjaya dipadam.")
-    except Exception as e:
-        print(f"   ⚠️ [CLEANUP WARN] Gagal memadam vision ocr json: {e}")
-
-    # 3. Padam fail gambar tempatan
     if local_image_path:
         img_p = Path(local_image_path)
         try:
@@ -62,6 +45,8 @@ def cleanup_temp_files(local_image_path: str = ""):
                 print(f"   🧹 [CLEANUP] Fail imej '{img_p.name}' berjaya dipadam.")
         except Exception as e:
             print(f"   ⚠️ [CLEANUP WARN] Gagal memadam imej fizikal: {e}")
+
+    print("   💾 [STATE PRESERVED] Fail JSON dalam temp/ dikekalkan untuk audit repositori.")
 
 
 def run_audit_and_commit():
@@ -115,7 +100,6 @@ def run_audit_and_commit():
             err_detail = res.get("error", "Status bukan success") if isinstance(res, dict) else "Tiada maklumat"
             print(f"   • {platform.capitalize()}: {err_detail}")
 
-        # Kekalkan fail untuk rujukan debug tempatan
         sys.exit(1)
 
     print("\n✅ [GATEKEEPER PASSED] Sekurang-kurangnya 1 platform berjaya pos. Meneruskan transaksi...")
@@ -151,9 +135,9 @@ def run_audit_and_commit():
         print(f"⚠️ [SUPABASE WARN] {sb_msg}")
 
     # =========================================================================
-    # STEP 8: PEMBERSIHAN FAIL SEMENTARA
+    # STEP 8: PEMBERSIHAN FAIL IMEJ SAHAJA
     # =========================================================================
-    print(f"\n🧹 [STEP 8] Membersihkan fail sementara...")
+    print(f"\n🧹 [STEP 8] Membersihkan fail imej tempatan...")
     cleanup_temp_files(local_img)
 
     print("\n" + "=" * 75)
