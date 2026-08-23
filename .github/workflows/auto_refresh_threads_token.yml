@@ -1,0 +1,33 @@
+name: Auto Refresh Threads Token
+
+on:
+  schedule:
+    # Berjalan setiap 2 hari sekali pada jam 02:00 UTC (10:00 AM Waktu Malaysia)
+    - cron: '0 2 */2 * *'
+  workflow_dispatch: # Membolehkan ujian manual dari tab Actions di GitHub
+
+jobs:
+  refresh-token:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: 🐍 Set up Python 3.10
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔄 Run Refresh Threads Token Job
+        env:
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_THREADS_ACCESS_TOKEN: ${{ secrets.IRCM_THREADS_ACCESS_TOKEN }}
+        run: |
+          python bin/run_refresh_threads_token.py

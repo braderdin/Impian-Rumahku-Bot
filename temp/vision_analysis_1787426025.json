@@ -1,0 +1,13 @@
+{
+    "product_name": "Inspirasi Dekorasi & Ruang Kediaman Selesa",
+    "image_url": "https://images.unsplash.com/photo-1747336754979-cb1078ce73f5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3wxMDI2NTk4fDB8MXxyYW5kb218fHx8fHx8fHwxNzg3NDI2MDI1fA&ixlib=rb-4.1.0&q=80&w=1080",
+    "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "visual_analysis_en": {
+        "main_subject_and_focus": "Kitchen island with a white countertop and light wood base",
+        "surrounding_elements_and_background": "To the left, a living area features a beige sofa with pillows, a wooden coffee table, and a small wooden bench topped with a straw hat. Large sliding glass doors reveal a patio with wicker furniture. The center wall displays three macrame wall mirrors of varying sizes. To the right, open wooden shelves hold glass jars and a trailing plant, next to a white refrigerator.",
+        "ocr_detected_text": "None",
+        "lighting_color_and_ambiance": "Bright natural light streams in from the left, complemented by warm artificial light from a large woven rectangular pendant lamp and smaller tiered woven lamps. The color palette is neutral, dominated by creams, beiges, and natural wood tones, creating a relaxed, airy, and bohemian ambiance.",
+        "materials_and_textures": "Light-colored wood, woven wicker/rattan (for the pendant lights and wall hangings), linen fabric (curtains and table runner), ceramic (planters and bowls), glass (candlesticks and jars), and smooth stone or concrete (island base)."
+    },
+    "analyzed_at": "2026-08-23 03:14:18"
+}
