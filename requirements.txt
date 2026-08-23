@@ -10,7 +10,7 @@ six>=1.16.0
 # Video & Audio Engine (Reels & Story Stitching)
 moviepy>=2.2.1
 imageio>=2.37.4
-imageio-ffmpeg>=0.5.0
+imageio-ffmpeg>=0.6.0
 mutagen>=1.47.0
 Pillow>=10.0.0
 
