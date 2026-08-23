@@ -3,7 +3,7 @@ requests>=2.31.0
 python-dotenv>=1.0.0
 urllib3>=2.7.0
 certifi
-charset-normalizer>=3.3.0
+charset-normalizer>=3.5.1
 idna>=3.7
 six>=1.17.0
 
