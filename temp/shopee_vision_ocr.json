@@ -1,14 +1,14 @@
 {
   "step": 2,
-  "shopee_product_id": "3643564730",
-  "shopee_product_name": "Cleaning🧽 Plastik Beg Automatic Closing Tie On Drawstring Garbage Bag Bags With Rope Easy Pull Portable Dustbin 抽绳垃圾袋",
-  "shopee_brand": "ATP Professional Business Solution",
-  "shopee_price": 1.2,
-  "shopee_picture_url": "https://down-my.img.susercontent.com/file/sg-11134201-82607-mjdhls7ycttw11",
-  "shopee_affiliate_link": "https://s.shopee.com.my/1Vyc4gQUNt",
-  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_3643564730.jpg",
-  "mama_english_review": "A sleek mesh waste bin showcases a bright orangeâtied drawstring bag, while four vivid rollsâblue, red, yellow, blackâpromise colorâcoded organization. The sturdy plastic ties seal automatically, keeping odors contained, and the portable, easyâpull design fits any kitchen, office or bathroom dustbin for tidy, hassleâfree cleaning.",
-  "review_char_count": 332,
+  "shopee_product_id": "57902057167",
+  "shopee_product_name": "YAKO Ceramic Mug with Lid Clean Cute Birthday Giftboxed Children Birthday Gift For Women Mug tumbler Cute Coffee Cup可爱杯子",
+  "shopee_brand": "YAKO Official Store",
+  "shopee_price": 28.4,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/my-11134207-820l9-mhh3lm4r5fcw63",
+  "shopee_affiliate_link": "https://s.shopee.com.my/3B6q3kK918",
+  "local_image_path": "/home/runner/work/Impian-Rumahku-Bot/Impian-Rumahku-Bot/temp/shopee_57902057167.jpg",
+  "mama_english_review": "The YAKO ceramic mug features a smooth, glossy finish in pastel pink and creamy white, topped with a whimsical mushroomâshaped lid that doubles as a cozy cover. Its rounded handle and adorable face add charm, while the sturdy stoneware body keeps drinks warm. Presented in a checkered gift box, it serves as a stylish coffee cup, tea tumbler, or playful desk accessory, perfect for birthdays, housewarming, or everyday indulgence.",
+  "review_char_count": 430,
   "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "post_results": {
     "facebook": {
@@ -30,5 +30,5 @@
     "instagram": "",
     "bluesky": ""
   },
-  "created_at": "2026-08-24 06:59:45"
+  "created_at": "2026-08-23 23:23:25"
 }
