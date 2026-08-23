@@ -1,0 +1,119 @@
+name: 🟠 Impian Rumahku - Shopee Feed Auto-Poster
+
+on:
+  schedule:
+    # 10 Hantaran Sehari (Minit 17):
+    # MYT Siang & Malam (7x): 05:17, 08:17, 11:17, 14:17, 17:17, 20:17, 23:17
+    # MYT Tengah Malam (3x): 00:17, 02:17, 04:17
+    - cron: '17 0,3,6,9,12,15,16,18,20,21 * * *'
+  workflow_dispatch: # Butang larian manual di tab Actions GitHub
+
+jobs:
+  auto-post-shopee-feed-job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout Kod Repositori
+        uses: actions/checkout@v7
+
+      - name: 🐍 Konfigurasi Persekitaran Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Pasang Pustaka Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🚀 Step 1 - Pengambilan & Penapisan Calon Produk Shopee
+        env:
+          IRCM_SUPABASE_URL: ${{ secrets.IRCM_SUPABASE_URL }}
+          IRCM_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.IRCM_SUPABASE_SERVICE_ROLE_KEY }}
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_UPSTASH_VECTOR_REST_URL: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_URL }}
+          IRCM_UPSTASH_VECTOR_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_TOKEN }}
+        run: |
+          python bin/run_shopee_prepare_and_generate.py
+
+      - name: 👁️ Step 2 - Vision Reader & Janaan Ulasan Mama English
+        env:
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_VISION: ${{ secrets.IRCM_MODEL_VISION }}
+        run: |
+          python bin/run_shopee_ocr_vison_reader.py
+
+      - name: 🔵 Step 3A - Pemposan Facebook Page Feed & Komen Affiliate
+        env:
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_PRIMARY: ${{ secrets.IRCM_MODEL_PRIMARY }}
+          IRCM_MODEL_FALLBACK_1: ${{ secrets.IRCM_MODEL_FALLBACK_1 }}
+          IRCM_MODEL_FALLBACK_2: ${{ secrets.IRCM_MODEL_FALLBACK_2 }}
+          IRCM_FB_META_PAGE_ID: ${{ secrets.IRCM_FB_META_PAGE_ID }}
+          IRCM_FB_META_PAGE_ACCESS_TOKEN: ${{ secrets.IRCM_FB_META_PAGE_ACCESS_TOKEN }}
+        run: |
+          python bin/run_shopee_post_fb.py
+
+      - name: 📸 Step 3B - Pemposan Instagram Feed (Via B2 Signed Bridge)
+        env:
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_PRIMARY: ${{ secrets.IRCM_MODEL_PRIMARY }}
+          IRCM_MODEL_FALLBACK_1: ${{ secrets.IRCM_MODEL_FALLBACK_1 }}
+          IRCM_MODEL_FALLBACK_2: ${{ secrets.IRCM_MODEL_FALLBACK_2 }}
+          IRCM_INSTAGRAM_ACCOUNT_ID: ${{ secrets.IRCM_INSTAGRAM_ACCOUNT_ID }}
+          IRCM_INSTAGRAM_ACCESS_TOKEN: ${{ secrets.IRCM_INSTAGRAM_ACCESS_TOKEN }}
+          IRCM_B2_KEY_ID: ${{ secrets.IRCM_B2_KEY_ID }}
+          IRCM_B2_APPLICATION_KEY: ${{ secrets.IRCM_B2_APPLICATION_KEY }}
+          IRCM_B2_BUCKET_NAME: ${{ secrets.IRCM_B2_BUCKET_NAME }}
+          IRCM_B2_BUCKET_ID: ${{ secrets.IRCM_B2_BUCKET_ID }}
+        run: |
+          python bin/run_shopee_post_instagram.py
+
+      - name: 🧵 Step 3C - Pemposan Meta Threads Feed (Redis Active Token)
+        env:
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_PRIMARY: ${{ secrets.IRCM_MODEL_PRIMARY }}
+          IRCM_MODEL_FALLBACK_1: ${{ secrets.IRCM_MODEL_FALLBACK_1 }}
+          IRCM_MODEL_FALLBACK_2: ${{ secrets.IRCM_MODEL_FALLBACK_2 }}
+          IRCM_THREADS_USER_ID: ${{ secrets.IRCM_THREADS_USER_ID }}
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_THREADS_ACCESS_TOKEN: ${{ secrets.IRCM_THREADS_ACCESS_TOKEN }}
+          IRCM_B2_KEY_ID: ${{ secrets.IRCM_B2_KEY_ID }}
+          IRCM_B2_APPLICATION_KEY: ${{ secrets.IRCM_B2_APPLICATION_KEY }}
+          IRCM_B2_BUCKET_NAME: ${{ secrets.IRCM_B2_BUCKET_NAME }}
+          IRCM_B2_BUCKET_ID: ${{ secrets.IRCM_B2_BUCKET_ID }}
+        run: |
+          python bin/run_shopee_post_threads.py
+
+      - name: 🦋 Step 3D - Pemposan Bluesky Feed (AT-Protocol)
+        env:
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_PRIMARY: ${{ secrets.IRCM_MODEL_PRIMARY }}
+          IRCM_MODEL_FALLBACK_1: ${{ secrets.IRCM_MODEL_FALLBACK_1 }}
+          IRCM_MODEL_FALLBACK_2: ${{ secrets.IRCM_MODEL_FALLBACK_2 }}
+          IRCM_BLUESKY_HANDLE: ${{ secrets.IRCM_BLUESKY_HANDLE }}
+          IRCM_BLUESKY_APP_PASSWORD: ${{ secrets.IRCM_BLUESKY_APP_PASSWORD }}
+        run: |
+          python bin/run_shopee_post_blsky.py
+
+      - name: 📊 Step 4-8 - Telegram Audit, Gatekeeper & Transaksi Pangkalan Data
+        env:
+          IRCM_TELEGRAM_BOT_TOKEN: ${{ secrets.IRCM_TELEGRAM_BOT_TOKEN }}
+          IRCM_TELEGRAM_CHAT_ID: ${{ secrets.IRCM_TELEGRAM_CHAT_ID }}
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_UPSTASH_VECTOR_REST_URL: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_URL }}
+          IRCM_UPSTASH_VECTOR_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_TOKEN }}
+          IRCM_SUPABASE_URL: ${{ secrets.IRCM_SUPABASE_URL }}
+          IRCM_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.IRCM_SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python bin/run_shopee_audit_and_commit.py
