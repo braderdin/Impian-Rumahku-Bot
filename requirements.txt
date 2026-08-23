@@ -23,5 +23,5 @@ et_xmlfile>=2.0.0
 # Utilities
 tqdm>=4.70.0
 python-dateutil>=2.9.0.post0
-decorator>=5.1.1
+decorator>=5.3.1
 proglog>=0.1.10
