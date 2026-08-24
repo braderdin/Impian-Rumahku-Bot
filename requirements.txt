@@ -6,13 +6,20 @@ certifi
 charset-normalizer>=3.5.1
 idna>=3.7
 six>=1.17.0
+tenacity>=8.2.3
 
-# Video & Audio Engine (Reels & Story Stitching)
+# Video & Audio Engine (Reels, Story Stitching & Beat Sync)
 moviepy>=2.2.1
 imageio>=2.37.4
 imageio-ffmpeg>=0.6.0
 mutagen>=1.47.0
 Pillow>=10.0.0
+librosa>=0.10.1
+soundfile>=0.12.1
+pydub>=0.25.1
+
+# Social Media Protocols
+atproto>=0.0.45
 
 # Data Processing & Spreadsheet (Affiliate Data & Supabase Tools)
 numpy>=1.26.0
@@ -20,8 +27,9 @@ pandas>=3.0.5
 openpyxl>=3.1.0
 et_xmlfile>=2.0.0
 
-# Utilities
+# Utilities & Logging
 tqdm>=4.70.0
+rich>=13.7.0
 python-dateutil>=2.9.0.post0
 decorator>=5.3.1
 proglog>=0.1.10

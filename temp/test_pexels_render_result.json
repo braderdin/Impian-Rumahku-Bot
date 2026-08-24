@@ -1,0 +1,77 @@
+{
+  "status": "success",
+  "video_title": "Home Closet Wardrobe Organizing Aesthetic",
+  "video_theme_keyword": "home closet wardrobe organizing aesthetic",
+  "rendered_video_path": "/home/braderdin/Impian-Rumahku-Bot/experiments/pexels_output/pexels_mama_reel_1787577625.mp4",
+  "video_duration_seconds": 33,
+  "keyframes_extracted": [
+    {
+      "frame": 1,
+      "timestamp": 5.0,
+      "size": "4.9 KB"
+    },
+    {
+      "frame": 2,
+      "timestamp": 13.4,
+      "size": "8.7 KB"
+    },
+    {
+      "frame": 3,
+      "timestamp": 21.8,
+      "size": "4.7 KB"
+    },
+    {
+      "frame": 4,
+      "timestamp": 30.2,
+      "size": "10.7 KB"
+    }
+  ],
+  "clips_used": [
+    {
+      "id": "7749197",
+      "duration": 10,
+      "url": "https://videos.pexels.com/video-files/7749197/7749197-hd_720_1280_60fps.mp4",
+      "width": 720,
+      "height": 1280
+    },
+    {
+      "id": "37356842",
+      "duration": 9,
+      "url": "https://videos.pexels.com/video-files/37356842/15823223_540_960_30fps.mp4",
+      "width": 540,
+      "height": 960
+    },
+    {
+      "id": "35897582",
+      "duration": 5,
+      "url": "https://videos.pexels.com/video-files/35897582/15226263_540_960_30fps.mp4",
+      "width": 540,
+      "height": 960
+    },
+    {
+      "id": "7670307",
+      "duration": 13,
+      "url": "https://videos.pexels.com/video-files/7670307/7670307-sd_540_960_25fps.mp4",
+      "width": 540,
+      "height": 960
+    },
+    {
+      "id": "9146503",
+      "duration": 9,
+      "url": "https://videos.pexels.com/video-files/9146503/9146503-uhd_1440_2560_30fps.mp4",
+      "width": 1440,
+      "height": 2560
+    }
+  ],
+  "music_metadata": {
+    "title": "Robot Strut",
+    "artist": "Impian Rumahku Composer",
+    "vibe": "Muzik Estetik Santai Impian Rumahku",
+    "filename": "Robot_Strut.mp4",
+    "file_path": "/home/braderdin/Impian-Rumahku-Bot/assets/music/Robot_Strut.mp4"
+  },
+  "vision_ai_review": "A serene visual journey into mindful wardrobe curation, flowing gracefully from warm, minimalist beige tones to the tactile joy of organizing soft pinks and neutrals. Transitioning through clean, artistic shadows into a tidy wooden sanctuary, the color-coordinated clothes and neat baskets harmonize beautifully under gentle, inviting light. This soothing aesthetic progression captures a sophisticated lifestyle ambiance of quiet, curated elegance and peaceful domestic satisfaction.",
+  "vision_model_used": "dots-studio/dots-3-note-preview:free",
+  "review_char_count": 484,
+  "timestamp": "2026-08-24 21:25:36"
+}

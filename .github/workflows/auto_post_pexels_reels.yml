@@ -1,0 +1,92 @@
+name: 🎬 Auto Post Pexels Reels (Cerita Mama)
+
+on:
+  schedule:
+    # 4 Waktu Siaran Sehari (Zon Waktu Malaysia MYT = UTC+8):
+    # 1. 07:30 AM MYT -> 23:30 UTC (Hari Sebelumnya)
+    # 2. 12:30 PM MYT -> 04:30 UTC
+    # 3. 05:30 PM MYT -> 09:30 UTC
+    # 4. 09:30 PM MYT -> 13:30 UTC
+    - cron: '30 23,4,9,13 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: pexels-reels-pipeline
+  cancel-in-progress: false
+
+jobs:
+  render-and-publish-reels:
+    name: 🚀 Render & Publish Video Reels (FB, IG, Threads, Bluesky)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install System Multimedia Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+
+      - name: 📥 Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🎬 Run Master Reels Pipeline
+        env:
+          # 1. OpenRouter AI Persona
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_VISION: ${{ secrets.IRCM_MODEL_VISION }}
+          IRCM_MODEL_VISION_FALLBACK_1: ${{ secrets.IRCM_MODEL_VISION_FALLBACK_1 }}
+          IRCM_MODEL_PRIMARY: ${{ secrets.IRCM_MODEL_PRIMARY }}
+          IRCM_MODEL_FALLBACK_1: ${{ secrets.IRCM_MODEL_FALLBACK_1 }}
+          IRCM_MODEL_FALLBACK_2: ${{ secrets.IRCM_MODEL_FALLBACK_2 }}
+          IRCM_MODEL_FALLBACK_3: ${{ secrets.IRCM_MODEL_FALLBACK_3 }}
+          IRCM_MODEL_FALLBACK_4: ${{ secrets.IRCM_MODEL_FALLBACK_4 }}
+
+          # 2. Upstash Redis & Vector DB
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_UPSTASH_VECTOR_REST_URL: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_URL }}
+          IRCM_UPSTASH_VECTOR_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_TOKEN }}
+
+          # 3. Telegram Bot Audit
+          IRCM_TELEGRAM_BOT_TOKEN: ${{ secrets.IRCM_TELEGRAM_BOT_TOKEN }}
+          IRCM_TELEGRAM_CHAT_ID: ${{ secrets.IRCM_TELEGRAM_CHAT_ID }}
+
+          # 4. Meta Facebook Page & Reels
+          IRCM_FB_META_PAGE_ID: ${{ secrets.IRCM_FB_META_PAGE_ID }}
+          IRCM_FB_META_PAGE_ACCESS_TOKEN: ${{ secrets.IRCM_FB_META_PAGE_ACCESS_TOKEN }}
+
+          # 5. Instagram Professional Account & Reels
+          IRCM_INSTAGRAM_ACCOUNT_ID: ${{ secrets.IRCM_INSTAGRAM_ACCOUNT_ID }}
+          IRCM_INSTAGRAM_ACCESS_TOKEN: ${{ secrets.IRCM_INSTAGRAM_ACCESS_TOKEN }}
+
+          # 6. Meta Threads API
+          IRCM_THREADS_USER_ID: ${{ secrets.IRCM_THREADS_USER_ID }}
+          IRCM_THREADS_ACCESS_TOKEN: ${{ secrets.IRCM_THREADS_ACCESS_TOKEN }}
+
+          # 7. Media Providers (Pexels)
+          IRCM_PEXELS_API_KEY: ${{ secrets.IRCM_PEXELS_API_KEY }}
+
+          # 8. Backblaze B2 Storage (Video Hosting)
+          IRCM_B2_BUCKET_NAME: ${{ secrets.IRCM_B2_BUCKET_NAME }}
+          IRCM_B2_BUCKET_ID: ${{ secrets.IRCM_B2_BUCKET_ID }}
+          IRCM_B2_KEY_ID: ${{ secrets.IRCM_B2_KEY_ID }}
+          IRCM_B2_ACCOUNT_KEY_ID: ${{ secrets.IRCM_B2_ACCOUNT_KEY_ID }}
+          IRCM_B2_APPLICATION_KEY: ${{ secrets.IRCM_B2_APPLICATION_KEY }}
+
+          # 9. Bluesky AT-Protocol API
+          IRCM_BLUESKY_HANDLE: ${{ secrets.IRCM_BLUESKY_HANDLE }}
+          IRCM_BLUESKY_APP_PASSWORD: ${{ secrets.IRCM_BLUESKY_APP_PASSWORD }}
+        run: |
+          python3 bin/run_pexels_reels_master.py
