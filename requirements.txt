@@ -33,3 +33,10 @@ rich>=13.7.0
 python-dateutil>=2.9.0.post0
 decorator>=5.3.1
 proglog>=0.1.10
+
+# NLP & Local Translation Engine (Malaya BM Malaysia)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+malaya
+sentencepiece
+protobuf

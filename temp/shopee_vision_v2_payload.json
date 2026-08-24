@@ -1,0 +1,20 @@
+{
+  "step": 2,
+  "shopee_product_id": "40069340429",
+  "shopee_product_name": "Holo Flask 600-1000ML 3 in 1 Water Bottle With Paracord & Boot Tumbler hot and cold Tumbler for kids /adult Thermos cup",
+  "shopee_product_clean_title": "Holo Flask 600 1000ML 3 in 1 Water",
+  "shopee_brand": "Barang Baik.my",
+  "shopee_price": 15.7,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/cn-11134207-820l4-mlsv3af25a0z33",
+  "shopee_affiliate_link": "https://s.shopee.com.my/6L3rpWHYBo",
+  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_40069340429.jpg",
+  "myt_time_context": "Selasa, 25 Ogos 2026, 07:24 AM (Pagi)",
+  "day_mood": "Rutin praktikal mengurus ruang harian dengan kemas dan teratur",
+  "vision_english_review": "This durable bottle is made of sturdy insulated material in simple, functional colors that look very clean. The secure lid prevents spills, keeping your surfaces spotless. It is a practical choice that makes your daily cleaning routine easier and keeps your space tidy.",
+  "review_char_count_en": 269,
+  "translated_bm_review": "Botol tahan lasak ini diperbuat daripada bahan pengalir yang kukuh dalam warna yang mudah dan berfungsi yang kelihatan sangat bersih. Lilin yang selamat menghalang tumpahan, memastikan permukaan anda tidak kelihatan. Ia adalah pilihan praktikal yang memudahkan rutin pembersihan harian anda dan memastikan ruang anda kemas.",
+  "review_char_count_bm": 323,
+  "vision_model_used": "dots-studio/dots-3-note-preview:free",
+  "translation_engine": "mesolitica/nanot5-base-malaysian-translation-v2.1",
+  "created_at": "2026-08-25 07:25:23"
+}

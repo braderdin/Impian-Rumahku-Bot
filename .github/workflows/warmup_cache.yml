@@ -1,0 +1,50 @@
+name: Warmup & Maintain Pipeline Cache
+
+on:
+  schedule:
+    # Berjalan automatik setiap 5 hari sekali pada jam 12:00 AM UTC (8:00 AM Waktu Malaysia)
+    - cron: '0 0 */5 * *'
+  workflow_dispatch: # Butang manual trigger di GitHub UI
+
+jobs:
+  warmup-cache:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Kod Repositori
+        uses: actions/checkout@v4
+
+      - name: Pasang Persekitaran Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # Cache direktori ~/.cache/pip dan ~/.cache/huggingface serentak
+      - name: Pulihkan / Simpan Cache Pip & Hugging Face
+        id: pipeline-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-ircm-cache-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-ircm-cache-
+
+      # Pasang semua pustaka daripada requirements.txt
+      - name: Pasang Pustaka Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Muat turun dan kunci model Mesolitica terus ke dalam folder ~/.cache/huggingface
+      - name: Pra-Muat Turun Model Mesolitica NanoT5
+        run: |
+          python -c "
+          from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+          model_name = 'mesolitica/nanot5-base-malaysian-translation-v2.1'
+          print('⏳ Mula memuat turun & menyimpan cache:', model_name)
+          AutoTokenizer.from_pretrained(model_name)
+          AutoModelForSeq2SeqLM.from_pretrained(model_name)
+          print('✅ Model berjaya dimuat turun dan dikunci ke ~/.cache/huggingface')
+          "
