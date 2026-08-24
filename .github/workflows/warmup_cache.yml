@@ -14,10 +14,10 @@ jobs:
       - name: Checkout Kod Repositori
         uses: actions/checkout@v7
 
-      - name: Pasang Persekitaran Python 3.10
+      - name: Pasang Persekitaran Python 3.11
         uses: actions/setup-python@v7
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       # Cache direktori ~/.cache/pip dan ~/.cache/huggingface serentak
       - name: Pulihkan / Simpan Cache Pip & Hugging Face
