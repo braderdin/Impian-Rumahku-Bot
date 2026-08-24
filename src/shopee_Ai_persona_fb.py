@@ -271,7 +271,7 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    "temperature": 0.45,
+                    "temperature": 0.40,
                 }
 
                 res = requests.post(endpoint_url, headers=headers, json=post_payload, timeout=40)

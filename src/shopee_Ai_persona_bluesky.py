@@ -7,7 +7,7 @@ Features:
 - Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural storytelling
 - Title Cleaner: Strips raw emojis, CJK symbols, and brackets automatically
 - Strict Micro-storytelling: ~15 to 25 words for Mama review body
-- Temperature: 0.45 without max_tokens constraint
+- Temperature: 0.40 without max_tokens constraint
 - Hard safety cap: Strictly <= 280 characters total (AT-Protocol post limit)
 - AT-Protocol native session authentication & direct binary blob image upload
 - Automatic UTF-8 byte facet generation for clickable Shopee affiliate links
@@ -252,7 +252,7 @@ def generate_mama_bluesky_copy(payload: Dict[str, Any]) -> str:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    "temperature": 0.45,
+                    "temperature": 0.40,
                 }
                 res = requests.post(endpoint_url, headers=headers, json=post_payload, timeout=(6, 20))
                 if res.status_code == 200:

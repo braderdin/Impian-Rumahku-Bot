@@ -6,7 +6,7 @@ Features:
 - Reads temp/shopee_vision_ocr.json
 - Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural lifestyle tone
 - Title Cleaner: Removes raw emojis, CJK symbols, and brackets automatically
-- Raw Payload: No max_tokens restriction, fixed temperature=0.45 for stable completion
+- Raw Payload: No max_tokens restriction, fixed temperature=0.40 for stable completion
 - Hard safety cap: <= 490 characters total (Threads 500 character limit)
 - Dynamic Active Token: Reads Redis 'auth:impianrumahku:threads_token' first, fallback to .env
 - Private Ephemeral B2 Hosting: 3x Upload & Pod Re-fetch Retry Loop (Signed 600s URL -> Auto Delete)
@@ -464,7 +464,7 @@ def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    "temperature": 0.45,
+                    "temperature": 0.40,
                 }
                 res = requests.post(endpoint_url, headers=headers, json=post_payload, timeout=35)
                 if res.status_code == 200:
