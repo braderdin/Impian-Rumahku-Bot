@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Shopee AI Persona Facebook Generator & Auto-Poster
+Shopee AI Persona Facebook Generator & Auto-Poster (MYT-Time Aware & Emoji-Scrubbed)
 Impian Rumahku Ecosystem (Step 3 & 4 Facebook Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
-- Raw payload without max_tokens/temperature constraints for natural text completion
-- Cleaned title input (CJK/foreign characters stripped)
-- Converts smart quotes and dashes to standard ASCII
-- Automatic sentence trimming to the last complete sentence/period
-- Strictly ensures post caption length is between 500 and 750 characters
+- Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural storytelling
+- Title Cleaner: Removes raw emojis and foreign CJK characters automatically
+- Raw Payload: No max_tokens restriction for fluid, unclipped completions
+- Post Length: Target 500 - 750 characters total post caption
 - AI Model Cascading: Primary (2x) -> Fallback 1 (2x) -> Fallback 2 (2x) -> Rule-based fallback
 - Facebook Strategy: Posts photo + caption to FB Page, posts locked affiliate link in 1st comment
 """
@@ -19,6 +18,7 @@ import sys
 import time
 import json
 import requests
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -38,6 +38,36 @@ else:
 # Folder Simpanan Sementara
 TEMP_DIR = PROJECT_ROOT / "temp"
 INPUT_JSON_FILE = TEMP_DIR / "shopee_vision_ocr.json"
+
+
+def get_myt_time_context() -> Tuple[str, str]:
+    """
+    Mendapatkan maklumat tarikh, hari, masa dan suasana waktu Malaysia (MYT / UTC+8).
+    """
+    myt_zone = timezone(timedelta(hours=8))
+    now = datetime.now(myt_zone)
+
+    days_bm = ["Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu", "Ahad"]
+    months_bm = [
+        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+    ]
+
+    day_name = days_bm[now.weekday()]
+    month_name = months_bm[now.month - 1]
+    hour = now.hour
+
+    if 5 <= hour < 12:
+        period = "Pagi"
+    elif 12 <= hour < 14:
+        period = "Tengah Hari"
+    elif 14 <= hour < 19:
+        period = "Petang"
+    else:
+        period = "Malam"
+
+    time_context = f"{day_name}, {now.day} {month_name} {now.year}, {now.strftime('%I:%M %p')} (Waktu {period})"
+    return time_context, period
 
 
 def get_fb_config() -> Tuple[Optional[str], Optional[str], str]:
@@ -88,28 +118,32 @@ def get_openrouter_config() -> Tuple[Optional[str], Optional[str], List[str], st
 
 def clean_shopee_title_for_prompt(title: str) -> str:
     """
-    Membuang aksara Cina/bukan Latin dan perkataan spam dari nama produk Shopee.
+    Membuang emoji mentah, aksara Cina/asing, dan simbol kurungan daripada tajuk produk.
     """
     if not title:
         return "Barangan Rumah Praktikal"
 
-    # Buang aksara CJK (Cina, Jepun, Korea)
-    cleaned = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", title)
-    cleaned = re.sub(r"[【】\[\]()_~*#]+", " ", cleaned)
+    # 1. Buang emoji mentah
+    emoji_pattern = re.compile(
+        "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
+        flags=re.UNICODE,
+    )
+    cleaned = emoji_pattern.sub("", title)
+
+    # 2. Buang aksara CJK (Cina, Jepun, Korea) & simbol kurungan
+    cleaned = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", cleaned)
+    cleaned = re.sub(r"[【】\[\]()_~*#|/\\-]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
-    return cleaned if cleaned else title[:60]
+    return cleaned if cleaned else title[:55]
 
 
 def trim_to_last_sentence(text: str) -> str:
     """
-    Memastikan teks berakhir dengan tanda noktah, seruan atau soal yang lengkap.
-    Membuang ayat tergantung di penghujung perenggan.
+    Memastikan teks berakhir dengan tanda noktah atau tanda seruan yang lengkap.
     """
     if not text:
         return ""
-    
-    # Cari tanda penamat ayat terakhir (. ! ?)
     match = re.search(r"^([\s\S]*[.!?])", text.strip())
     if match:
         return match.group(1).strip()
@@ -118,42 +152,28 @@ def trim_to_last_sentence(text: str) -> str:
 
 def clean_ai_output(text: str) -> str:
     """
-    Membersihkan tag pemikiran (<think>...), menormalkan tanda petik/sempang,
-    membuang emoji bawaan AI, dan memotong ayat tergantung.
+    Membersihkan tag pemikiran, menormalkan tanda baca, membuang emoji AI, dan memotong ayat tergantung.
     """
     if not text:
         return ""
 
-    # 1. Buang thinking tags dan markdown code blocks
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     cleaned = re.sub(r"```json\s*", "", cleaned)
     cleaned = re.sub(r"```\s*", "", cleaned)
 
-    # 2. Tukar tanda petik lengkung & sempang khas kepada format standard ASCII
     replacements = {
-        "’": "'",
-        "‘": "'",
-        "“": '"',
-        "”": '"',
-        "—": "-",
-        "–": "-",
-        "…": "...",
-        "\xa0": " ",
+        "’": "'", "‘": "'", "“": '"', "”": '"',
+        "—": "-", "–": "-", "…": "...", "\xa0": " ",
     }
     for orig, rep in replacements.items():
         cleaned = cleaned.replace(orig, rep)
 
-    # 3. Buang emoji bawaan AI
     emoji_pattern = re.compile(
         "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
         flags=re.UNICODE,
     )
     cleaned = emoji_pattern.sub("", cleaned)
-
-    # 4. Buang petikan luar berlebihan
     cleaned = cleaned.strip().strip('"').strip("'")
-
-    # 5. Potong ayat tergantung ke noktah terakhir
     cleaned = trim_to_last_sentence(cleaned)
 
     return cleaned.strip()
@@ -161,20 +181,15 @@ def clean_ai_output(text: str) -> str:
 
 def validate_text_quality(text: str) -> Tuple[bool, str]:
     """
-    Menyemak kualiti teks AI:
-    1. Tiada pengulangan perkataan yang rosak / gelung loop (> 10 kali).
-    2. Hanya mengandungi abjad/nombor/tanda baca Latin standard.
-    3. Panjang ulasan asas mencukupi (sekurang-kurangnya 180 aksara).
+    Menyemak kualiti teks AI (panjang teks dan abjad standard).
     """
     if not text or len(text) < 180:
         return False, f"Teks terlalu pendek ({len(text)} aksara, minima 180)."
 
-    # 1. Semakan Glitch Aksara Bukan Latin
     allowed_pattern = re.compile(r"^[a-zA-Z0-9\s.,!?'\"\–\—\-\(\)/%:;RMrm\n\r]+$")
     if not allowed_pattern.match(text):
         return False, "Dikesan simbol atau aksara tidak sah (bukan abjad Latin / tanda baca standard)."
 
-    # 2. Semakan Gelung Ayat Berulang (> 10 kali perkataan sama)
     words = re.findall(r"\b\w+\b", text.lower())
     if words:
         word_counts: Dict[str, int] = {}
@@ -189,28 +204,26 @@ def validate_text_quality(text: str) -> Tuple[bool, str]:
 
 def generate_fallback_fb_story(product_name: str, brand: str) -> str:
     """
-    Menjana ulasan santai persona Mama secara sandaran (rule-based)
-    sekiranya semua sambungan API AI tergendala.
+    Ulasan santai persona Mama sandaran jika panggilan AI tergendala.
     """
     clean_name = clean_shopee_title_for_prompt(product_name)
     return (
         f"Mama nak kongsi satu penemuan praktikal untuk kemaskan rumah kita iaitu {clean_name[:35]}. "
         f"Barang daripada {brand} ni memang memudahkan urusan harian suri rumah. "
-        f"Senang nak guna, ringan, dan sangat membantu bila nak bersihkan ruang bilik atau sofa tanpa rasa renyah. "
-        f"Rekaan yang kemas dan kukuh ni memang elok ada sekurang-kurangnya satu di rumah untuk kegunaan harian sekeluarga."
+        f"Senang nak guna, ringan, dan sangat membantu bila nak kemaskan ruang rumah tanpa rasa renyah. "
+        f"Rekaan yang kemas dan kukuh ni memang elok ada untuk kegunaan harian sekeluarga."
     )
 
 
 def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
     """
-    Menghasilkan penceritaan santai Bahasa Melayu bagi Facebook:
-    - Menggunakan maklumat daripada temp/shopee_vision_ocr.json
-    - Mencuba IRCM_MODEL_PRIMARY (2x) -> FALLBACK_1 (2x) -> FALLBACK_2 (2x) -> Fallback Asas
+    Menghasilkan ulasan santai Bahasa Melayu bagi Facebook dengan kefahaman masa MYT.
     """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title_for_prompt(raw_name)
     brand = payload.get("shopee_brand", "Shopee Preferred")
     vision_en = payload.get("mama_english_review", "") or payload.get("visual_analysis_en", {}).get("summary_text", "")
+    time_context, period = get_myt_time_context()
 
     endpoint_url, api_key, models, cfg_err = get_openrouter_config()
 
@@ -224,38 +237,41 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
     }
 
     system_prompt = (
-        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra dan suka bercerita santai.\n"
-        "Tugasan anda:\n"
-        "Baca ulasan visual Bahasa Inggeris yang diberikan, kemudian olah semula menjadi ulasan santai dalam BAHASA MELAYU MALAYSIA TULEN (bukan Bahasa Indonesia).\n\n"
-        "PANDUAN GAYA BAHASA:\n"
-        "1. Gunakan bahasa harian santai Malaysia ('Mama nak kongsi...', 'Korang tengok...', 'Memang senang...', 'Kemas betul...').\n"
-        "2. Jangan gunakan perkataan Indonesia seperti 'bisa', 'banget', 'nggak', 'yuk', 'bikin', 'gampang', 'koleksi'.\n"
-        "3. JANGAN sebut harga atau perkataan 'RM' (sistem kod akan letak harga sendiri di bahagian bawah).\n"
-        "4. JANGAN letak sebarang URL atau pautan Shopee di dalam ayat.\n"
-        "5. JANGAN gunakan emoji sama sekali (kod python akan masukkan emoji).\n"
-        "6. Tulis satu perenggan penceritaan santai yang lengkap sekitar 250 hingga 380 aksara dan pastikan diakhiri dengan tanda noktah (.).\n"
-        "7. Berikan teks ulasan secara terus tanpa tag pemikiran (<think>) atau teks pembuka."
+        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang peramah, "
+        "bijak, dan suka berkongsi idea hiasan serta kemas rumah bersama rakan media sosial.\n\n"
+        "Tugasan Utama:\n"
+        "1. Teliti nama produk dan ulasan visual Bahasa Inggeris yang diberikan.\n"
+        "2. Olah nama produk menjadi lebih ringkas, menarik, dan selesa disebut dalam ulasan.\n"
+        "3. Tulis 1 perenggan ulasan santai dalam Bahasa Melayu Malaysia tulen (sekitar 40 hingga 65 patah perkataan).\n"
+        "4. Sesuaikan sedikit nada pembuka mengikut waktu siaran jika sesuai.\n\n"
+        "Pantangan Ketat:\n"
+        "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang automatik oleh sistem).\n"
+        "- DILARANG letak sebarang URL atau pautan Shopee di dalam ayat.\n"
+        "- DILARANG guna emoji sama sekali (emoji diuruskan oleh kod).\n"
+        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, yuk, bikin, gampang).\n"
+        "- Pastikan perenggan diakhiri dengan tanda noktah yang lengkap.\n"
+        "- Terus berikan teks ulasan tanpa sebarang mukadimah atau tag pemikiran."
     )
 
     user_prompt = (
-        f"Maklumat Produk:\n"
-        f"- Nama: {clean_name}\n"
-        f"- Jenama: {brand}\n\n"
-        f"Ulasan Visual Bahasa Inggeris:\n\"{vision_en}\"\n\n"
-        f"Sila olah semula menjadi ulasan penceritaan Mama dalam Bahasa Melayu Malaysia (tanpa harga, tanpa emoji, tanpa URL, pastikan ayat lengkap bernoktah):"
+        f"Konteks Waktu Siaran: {time_context}\n"
+        f"Nama Asal Produk: {clean_name}\n"
+        f"Jenama: {brand}\n"
+        f"Rujukan Visual: {vision_en}\n\n"
+        f"Sila olah ulasan santai Mama dalam Bahasa Melayu Malaysia:"
     )
 
     for model_name in models:
         print(f"\n🧠 [AI PERSONA FB] Mencuba Model: {model_name}...")
         for attempt in range(1, 3):
             try:
-                # Muatan bersih tanpa max_tokens dan temperature
                 post_payload = {
                     "model": model_name,
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
+                    "temperature": 0.45,
                 }
 
                 res = requests.post(endpoint_url, headers=headers, json=post_payload, timeout=40)
@@ -277,7 +293,7 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
 
             time.sleep(2)
 
-    print("🛡️ [FALLBACK AKTIF] Kesemua model AI gagal/glitch. Menggunakan penceritaan sandaran asas.")
+    print("🛡️ [FALLBACK AKTIF] Kesemua model AI gagal. Menggunakan penceritaan sandaran asas.")
     return generate_fallback_fb_story(raw_name, brand)
 
 
@@ -323,8 +339,7 @@ def post_to_facebook_page(
     comment_text: str
 ) -> Tuple[bool, Dict[str, Any], str]:
     """
-    Langkah 4: Menghantar gambar dan teks ke Facebook Page Feed,
-    kemudian membalas dengan komen pautan affiliate secara automatik.
+    Menghantar gambar dan teks ke Facebook Page Feed, kemudian membalas komen pautan affiliate.
     """
     page_id, page_token, err = get_fb_config()
     if err:
@@ -397,11 +412,7 @@ def post_to_facebook_page(
 
 def run_facebook_pipeline() -> Tuple[bool, str]:
     """
-    Fungsi Pengendali Utama Modul FB Persona:
-    1. Membaca temp/shopee_vision_ocr.json
-    2. Menjana ulasan BM Persona Mama (500-750 aksara)
-    3. Membina hantaran & komen
-    4. Menyiarkan ke Facebook Page Feed & Komen secara langsung
+    Fungsi Pengendali Utama Modul FB Persona.
     """
     if not INPUT_JSON_FILE.exists():
         return False, f"Fail input {INPUT_JSON_FILE.name} tidak ditemui dalam folder temp/. Sila jalankan Step 2 dahulu."
@@ -409,10 +420,7 @@ def run_facebook_pipeline() -> Tuple[bool, str]:
     with open(INPUT_JSON_FILE, "r", encoding="utf-8") as f:
         payload = json.load(f)
 
-    # 1. Jana penceritaan santai BM
     mama_story_bm = generate_mama_fb_copy(payload)
-
-    # 2. Cantumkan hantaran FB & komen affiliate
     post_caption, comment_text = assemble_fb_post_and_comment(payload, mama_story_bm)
 
     char_len = len(post_caption)
@@ -427,7 +435,6 @@ def run_facebook_pipeline() -> Tuple[bool, str]:
     print(comment_text)
     print("=" * 70)
 
-    # 3. Hantar ke Facebook Page Sebenar
     img_path = payload.get("local_image_path", "")
     img_url = payload.get("shopee_picture_url", "")
 

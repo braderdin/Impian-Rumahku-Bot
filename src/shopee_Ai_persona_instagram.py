@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Shopee AI Persona Instagram Generator & Auto-Poster
+Shopee AI Persona Instagram Generator & Auto-Poster (MYT-Time Aware & Emoji-Scrubbed)
 Impian Rumahku Ecosystem (Step 3 & 4 Instagram Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
-- Generates warm Malaysian homemaker ("Mama") copywriting (400 - 700 chars total)
-- Includes home decor / organizing hashtags and locked Shopee link
-- Private Ephemeral B2 Hosting: Uploads image -> Generates Signed URL (600s) -> Posts -> Deletes from B2
-- Enhanced B2 Resilience: 3x Upload & Pod Re-fetch Retry Loop
+- Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural lifestyle tone
+- Title Cleaner: Removes raw emojis, CJK symbols, and brackets automatically
+- Raw Payload: No max_tokens restriction for fluid, unclipped completions
+- Post Length: Target 400 - 600 characters total post caption
+- Private Ephemeral B2 Hosting: 3x Upload & Pod Re-fetch Retry Loop (Signed 600s URL -> Auto Delete)
 - 2-Stage Instagram Graph API Container Creation & Publishing
 - AI Cascading: Primary (2x) -> Fallback 1 (2x) -> Fallback 2 (2x) -> Rule-based fallback
-- 100% Code-Locked Affiliate Link and Product Price
+- 100% Code-Locked: Affiliate link and price remain immutable
 """
 
 import os
@@ -21,6 +22,7 @@ import json
 import hashlib
 import urllib.parse
 import requests
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -43,7 +45,41 @@ GRAPH_API_VERSION = "v21.0"
 
 
 # ==============================================================================
-# 1. KONFIGURASI INSTAGRAM & B2 STORAGE
+# 1. KONFIGURASI WAKTU MALAYSIA (MYT / UTC+8)
+# ==============================================================================
+
+def get_myt_time_context() -> Tuple[str, str]:
+    """
+    Mendapatkan maklumat tarikh, hari, masa dan suasana waktu Malaysia (MYT / UTC+8).
+    """
+    myt_zone = timezone(timedelta(hours=8))
+    now = datetime.now(myt_zone)
+
+    days_bm = ["Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu", "Ahad"]
+    months_bm = [
+        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+    ]
+
+    day_name = days_bm[now.weekday()]
+    month_name = months_bm[now.month - 1]
+    hour = now.hour
+
+    if 5 <= hour < 12:
+        period = "Pagi"
+    elif 12 <= hour < 14:
+        period = "Tengah Hari"
+    elif 14 <= hour < 19:
+        period = "Petang"
+    else:
+        period = "Malam"
+
+    time_context = f"{day_name}, {now.day} {month_name} {now.year}, {now.strftime('%I:%M %p')} (Waktu {period})"
+    return time_context, period
+
+
+# ==============================================================================
+# 2. KONFIGURASI INSTAGRAM, B2 STORAGE & OPENROUTER
 # ==============================================================================
 
 def get_instagram_config() -> Tuple[Optional[str], Optional[str], str]:
@@ -121,7 +157,7 @@ def get_openrouter_config() -> Tuple[Optional[str], Optional[str], List[str], st
 
 
 # ==============================================================================
-# 2. PENGHOSAN EFEMERAL BACKBLAZE B2 PRIVATE (SIGNED URL & AUTO-DELETE)
+# 3. PENGHOSAN EFEMERAL BACKBLAZE B2 PRIVATE (SIGNED URL & AUTO-DELETE)
 # ==============================================================================
 
 def b2_authorize(key_id: str, app_key: str) -> Tuple[bool, str, str, str, str]:
@@ -149,12 +185,10 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
     if cfg_err:
         return False, "", "", "", "", "", cfg_err
 
-    # 1. Authorize
     auth_ok, api_url, auth_token, download_url, auth_err = b2_authorize(key_id, app_key)
     if not auth_ok:
         return False, "", "", "", "", "", auth_err
 
-    # Bucket ID fallback
     if not bucket_id:
         list_b_url = f"{api_url}/b2api/v2/b2_list_buckets"
         b_res = requests.post(list_b_url, json={"accountId": key_id}, headers={"Authorization": auth_token}, timeout=20)
@@ -174,7 +208,6 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
     file_id = None
     upload_err_msg = ""
 
-    # 2. Gelung 3x Percubaan Muat Naik dengan Permintaan Pod Baharu
     for attempt in range(1, 4):
         get_up_url = f"{api_url}/b2api/v2/b2_get_upload_url"
         try:
@@ -212,7 +245,6 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
     if not file_id:
         return False, "", "", "", "", "", f"Gagal muat naik ke B2 selepas 3 percubaan: {upload_err_msg}"
 
-    # 3. Jana Signed Token (600 saat)
     try:
         down_auth_url = f"{api_url}/b2api/v2/b2_get_download_authorization"
         down_payload = {
@@ -256,14 +288,25 @@ def delete_ephemeral_image_from_b2(api_url: str, auth_token: str, file_id: str, 
 
 
 # ==============================================================================
-# 3. PENJANAAN AYAT PERSONA MAMA (INSTAGRAM: 400 - 700 AKSARA TOTAL)
+# 4. PENJANAAN AYAT PERSONA MAMA (INSTAGRAM: 400 - 600 AKSARA TOTAL)
 # ==============================================================================
 
 def clean_shopee_title(title: str, max_len: int = 40) -> str:
-    """Memotong tajuk pendek mengikut sempadan perkataan penuh."""
+    """
+    Membuang emoji mentah, aksara Cina/asing, dan memotong tajuk pendek mengikut sempadan perkataan.
+    """
     if not title:
         return "Barang Rumah Praktikal"
-    cleaned = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", title)
+
+    # 1. Buang emoji mentah
+    emoji_pattern = re.compile(
+        "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
+        flags=re.UNICODE,
+    )
+    cleaned = emoji_pattern.sub("", title)
+
+    # 2. Buang aksara CJK & kurungan
+    cleaned = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", cleaned)
     cleaned = re.sub(r"[【】\[\]()_~*#|/\\-]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
@@ -286,7 +329,7 @@ def clean_shopee_title(title: str, max_len: int = 40) -> str:
 
 
 def clean_ai_output(text: str) -> str:
-    """Membersihkan tag pemikiran dan membuang emoji AI."""
+    """Membersihkan tag pemikiran, menormalkan tanda baca, dan membuang emoji AI."""
     if not text:
         return ""
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
@@ -315,11 +358,11 @@ def clean_ai_output(text: str) -> str:
 
 
 def validate_instagram_text(text: str) -> Tuple[bool, str]:
-    """Menyemak kualiti teks ulasan Instagram (120 hingga 350 aksara)."""
+    """Menyemak kualiti teks ulasan Instagram (120 hingga 300 aksara)."""
     if not text or len(text) < 120:
         return False, f"Teks terlalu pendek ({len(text)} aksara, minima 120)."
-    if len(text) > 350:
-        return False, f"Teks terlalu panjang ({len(text)} aksara, maksima 350)."
+    if len(text) > 300:
+        return False, f"Teks terlalu panjang ({len(text)} aksara, maksima 300)."
 
     allowed_pattern = re.compile(r"^[a-zA-Z0-9\s.,!?'\"\–\—\-\(\)/%:;RMrm\n\r]+$")
     if not allowed_pattern.match(text):
@@ -332,21 +375,21 @@ def generate_fallback_instagram_story(product_name: str, brand: str) -> str:
     """Teks sandaran asas khas Instagram jika AI gagal."""
     clean_name = clean_shopee_title(product_name, max_len=30)
     return (
-        f"Mama nak kongsi satu lagi penemuan berguna untuk deko dan kemaskan rumah kita. "
-        f"{clean_name} daripada {brand} ni memang praktikal, senang nak simpan dan memudahkan rutin harian suri rumah."
+        f"Mama nak kongsi satu lagi penemuan berguna untuk kemaskan rumah kita iaitu {clean_name}. "
+        f"Barang daripada {brand} ni memang praktikal, senang nak guna dan memudahkan urusan harian keluarga."
     )
 
 
 def generate_mama_instagram_copy(payload: Dict[str, Any]) -> str:
     """
-    Menjana penceritaan santai Bahasa Melayu khas untuk Instagram Feed.
-    Menggunakan rujukan visual ringkas untuk mengekalkan beban inferens yang ringan.
+    Menjana ulasan santai Bahasa Melayu bagi Instagram Feed dengan kefahaman masa MYT.
     """
     raw_name = payload.get("shopee_product_name", "")
-    clean_name = clean_shopee_title(raw_name, max_len=30)
+    clean_name = clean_shopee_title(raw_name, max_len=35)
     brand = payload.get("shopee_brand", "Shopee Preferred")
     vision_en = payload.get("mama_english_review", "") or payload.get("visual_analysis_en", {}).get("summary_text", "")
-    short_vision = vision_en[:180]
+    short_vision = vision_en[:200]
+    time_context, period = get_myt_time_context()
 
     endpoint_url, api_key, models, cfg_err = get_openrouter_config()
     if cfg_err or not models:
@@ -358,17 +401,28 @@ def generate_mama_instagram_copy(payload: Dict[str, Any]) -> str:
     }
 
     system_prompt = (
-        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra dan suka berkongsi idea hiasan/kemas rumah.\n"
-        "Tugasan: Tulis 2 ayat ulasan santai bersahaja dalam BAHASA MELAYU MALAYSIA TULEN.\n\n"
-        "PANDUAN PENTING:\n"
-        "1. Gunakan nada perbualan mesra suri rumah ('Mama suka betul...', 'Kemas dan senang sangat...', 'Bila guna ni...').\n"
-        "2. JANGAN guna terjemahan kaku seperti 'Saya melihat...' atau perkataan Indonesia.\n"
-        "3. Panjang teks cerita WAJIB di antara 150 hingga 250 aksara.\n"
-        "4. JANGAN sebut harga/'RM', JANGAN letak link/URL, JANGAN guna emoji.\n"
-        "5. Pastikan ayat lengkap bernoktah (.)."
+        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra dan suka berkongsi idea hiasan/kemas rumah di Instagram.\n\n"
+        "Tugasan Utama:\n"
+        "1. Teliti nama produk dan ulasan visual Bahasa Inggeris yang diberikan.\n"
+        "2. Olah nama produk menjadi lebih ringkas, menarik, dan selesa disebut dalam penceritaan.\n"
+        "3. Tulis tepat 2 ayat ulasan santai bersahaja dalam Bahasa Melayu Malaysia tulen (sekitar 30 hingga 45 patah perkataan sahaja).\n"
+        "4. Selitkan sentuhan gaya hidup rumah yang kemas dan praktikal.\n\n"
+        "Pantangan Ketat:\n"
+        "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang oleh sistem).\n"
+        "- DILARANG letak sebarang pautan atau URL Shopee.\n"
+        "- DILARANG guna emoji sama sekali (kod python akan masukkan emoji).\n"
+        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, yuk, bikin, gampang).\n"
+        "- Pastikan ayat diakhiri dengan tanda noktah yang lengkap.\n"
+        "- Terus berikan ayat ulasan tanpa mukadimah atau tag pemikiran."
     )
 
-    user_prompt = f"Produk: {clean_name} ({brand})\nRujukan Visual: {short_vision}\nAyat ulasan santai Mama:"
+    user_prompt = (
+        f"Konteks Waktu Siaran: {time_context}\n"
+        f"Nama Asal Produk: {clean_name}\n"
+        f"Jenama: {brand}\n"
+        f"Rujukan Visual: {short_vision}\n\n"
+        f"Sila olah ulasan santai Mama untuk Instagram Feed:"
+    )
 
     for model_name in models:
         print(f"\n🧠 [AI INSTAGRAM] Mencuba Model: {model_name}...")
@@ -380,6 +434,7 @@ def generate_mama_instagram_copy(payload: Dict[str, Any]) -> str:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
+                    "temperature": 0.45,
                 }
                 res = requests.post(endpoint_url, headers=headers, json=post_payload, timeout=35)
                 if res.status_code == 200:
@@ -404,7 +459,7 @@ def generate_mama_instagram_copy(payload: Dict[str, Any]) -> str:
 
 def assemble_instagram_post(payload: Dict[str, Any], story_text: str) -> str:
     """
-    Menyusun kapsyen Instagram Feed lengkap (400 - 700 aksara) dengan susun atur kemas.
+    Menyusun kapsyen Instagram Feed lengkap dengan sasaran 400 - 600 aksara.
     """
     raw_name = payload.get("shopee_product_name", "")
     short_title = clean_shopee_title(raw_name, max_len=35)
@@ -424,9 +479,10 @@ def assemble_instagram_post(payload: Dict[str, Any], story_text: str) -> str:
 
     full_caption = f"{header}{body}{price_and_link}{hashtags}".strip()
 
-    if len(full_caption) > 700:
+    # Kawalan Had Maksimum 600 Aksara
+    if len(full_caption) > 600:
         fixed_len = len(header) + len(price_and_link) + len(hashtags)
-        available_story = 690 - fixed_len
+        available_story = 590 - fixed_len
         if len(story_text) > available_story:
             trimmed = story_text[:available_story]
             match = re.search(r"^([\s\S]*[.!?])", trimmed)
@@ -437,7 +493,7 @@ def assemble_instagram_post(payload: Dict[str, Any], story_text: str) -> str:
 
 
 # ==============================================================================
-# 4. DISPATCHER & PENERBITAN INSTAGRAM FEED
+# 5. DISPATCHER & PENERBITAN INSTAGRAM FEED
 # ==============================================================================
 
 def post_to_instagram_feed(
@@ -530,11 +586,11 @@ def run_instagram_pipeline() -> Tuple[bool, str]:
         final_caption = assemble_instagram_post(payload, story_bm)
 
         print("\n" + "=" * 70)
-        print("📝 [PRATONTON HANTARAN INSTAGRAM FEED (400 - 700 AKSARA)]")
+        print("📝 [PRATONTON HANTARAN INSTAGRAM FEED (400 - 600 AKSARA)]")
         print("=" * 70)
         print(final_caption)
         print("-" * 70)
-        print(f"📏 Jumlah Aksara: {len(final_caption)} / 700 aksara")
+        print(f"📏 Jumlah Aksara: {len(final_caption)} / 600 aksara")
         print("=" * 70)
 
         print(f"\n📡 Menghantar hantaran ke akaun Instagram (Account ID: {account_id})...")

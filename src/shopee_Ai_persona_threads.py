@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Shopee AI Persona Threads Generator & Auto-Poster (Mama Persona Tuned)
+Shopee AI Persona Threads Generator & Auto-Poster (MYT-Time Aware & Emoji-Scrubbed)
 Impian Rumahku Ecosystem (Step 3 & 4 Threads Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
-- Natural Malaysian homemaker storytelling (Mama persona, no stiff translations)
+- Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural lifestyle tone
+- Title Cleaner: Removes raw emojis, CJK symbols, and brackets automatically
+- Raw Payload: No max_tokens restriction, fixed temperature=0.45 for stable completion
+- Hard safety cap: <= 490 characters total (Threads 500 character limit)
 - Dynamic Active Token: Reads Redis 'auth:impianrumahku:threads_token' first, fallback to .env
-- Private Ephemeral B2 Hosting: Uploads temp image -> Generates Signed URL (600s) -> Posts -> Deletes from B2
-- Enhanced B2 Resilience: 3x Upload & Pod Re-fetch Retry Loop
+- Private Ephemeral B2 Hosting: 3x Upload & Pod Re-fetch Retry Loop (Signed 600s URL -> Auto Delete)
 - 2-Stage Threads Media Container creation & status polling
-- Hard safety cap: <= 490 characters total (Threads 500 limit)
-- 100% Code-Locked Affiliate Link and Product Price
+- 100% Code-Locked: Affiliate link and price remain immutable
 """
 
 import os
@@ -21,6 +22,7 @@ import json
 import hashlib
 import urllib.parse
 import requests
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
@@ -43,7 +45,41 @@ MAX_THREADS_HARD_CAP = 490
 
 
 # ==============================================================================
-# 1. KONFIGURASI THREADS & TOKEN AKTIF REDIS
+# 1. KONFIGURASI WAKTU MALAYSIA (MYT / UTC+8)
+# ==============================================================================
+
+def get_myt_time_context() -> Tuple[str, str]:
+    """
+    Mendapatkan maklumat tarikh, hari, masa dan suasana waktu Malaysia (MYT / UTC+8).
+    """
+    myt_zone = timezone(timedelta(hours=8))
+    now = datetime.now(myt_zone)
+
+    days_bm = ["Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu", "Ahad"]
+    months_bm = [
+        "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+        "Julai", "Ogos", "September", "Oktober", "November", "Disember"
+    ]
+
+    day_name = days_bm[now.weekday()]
+    month_name = months_bm[now.month - 1]
+    hour = now.hour
+
+    if 5 <= hour < 12:
+        period = "Pagi"
+    elif 12 <= hour < 14:
+        period = "Tengah Hari"
+    elif 14 <= hour < 19:
+        period = "Petang"
+    else:
+        period = "Malam"
+
+    time_context = f"{day_name}, {now.day} {month_name} {now.year}, {now.strftime('%I:%M %p')} (Waktu {period})"
+    return time_context, period
+
+
+# ==============================================================================
+# 2. KONFIGURASI THREADS, B2 STORAGE & OPENROUTER
 # ==============================================================================
 
 def get_redis_threads_token() -> Optional[str]:
@@ -153,13 +189,11 @@ def get_openrouter_config() -> Tuple[Optional[str], Optional[str], List[str], st
 
 
 # ==============================================================================
-# 2. PENGHOSAN EFEMERAL BACKBLAZE B2 PRIVATE (SIGNED URL & AUTO-DELETE)
+# 3. PENGHOSAN EFEMERAL BACKBLAZE B2 PRIVATE (SIGNED URL & AUTO-DELETE)
 # ==============================================================================
 
 def b2_authorize(key_id: str, app_key: str) -> Tuple[bool, str, str, str, str]:
-    """
-    Mendapatkan sesi autentikasi B2 REST API.
-    """
+    """Mendapatkan sesi autentikasi B2 REST API."""
     url = "https://api.backblazeb2.com/b2api/v2/b2_authorize_account"
     try:
         res = requests.get(url, auth=(key_id, app_key), timeout=20)
@@ -183,12 +217,10 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
     if cfg_err:
         return False, "", "", "", "", "", cfg_err
 
-    # 1. Authorize
     auth_ok, api_url, auth_token, download_url, auth_err = b2_authorize(key_id, app_key)
     if not auth_ok:
         return False, "", "", "", "", "", auth_err
 
-    # Bucket ID fallback
     if not bucket_id:
         list_b_url = f"{api_url}/b2api/v2/b2_list_buckets"
         b_res = requests.post(list_b_url, json={"accountId": key_id}, headers={"Authorization": auth_token}, timeout=20)
@@ -208,7 +240,6 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
     file_id = None
     upload_err_msg = ""
 
-    # 2. Gelung 3x Percubaan Muat Naik dengan Permintaan Pod Baharu
     for attempt in range(1, 4):
         get_up_url = f"{api_url}/b2api/v2/b2_get_upload_url"
         try:
@@ -246,7 +277,6 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
     if not file_id:
         return False, "", "", "", "", "", f"Gagal muat naik ke B2 selepas 3 percubaan: {upload_err_msg}"
 
-    # 3. Jana Signed Download Authorization Token (Sah 600 saat)
     try:
         down_auth_url = f"{api_url}/b2api/v2/b2_get_download_authorization"
         down_payload = {
@@ -270,9 +300,7 @@ def upload_temp_image_to_b2_signed(image_path: str) -> Tuple[bool, str, str, str
 
 
 def delete_ephemeral_image_from_b2(api_url: str, auth_token: str, file_id: str, file_name: str) -> bool:
-    """
-    Memadam fail imej sementara dari B2 Private Bucket.
-    """
+    """Memadam fail imej sementara dari B2 Private Bucket."""
     if not file_id or not file_name or not api_url or not auth_token:
         return False
 
@@ -292,16 +320,25 @@ def delete_ephemeral_image_from_b2(api_url: str, auth_token: str, file_id: str, 
 
 
 # ==============================================================================
-# 3. PENJANAAN AYAT PERSONA MAMA (THREADS: <= 490 AKSARA)
+# 4. PENJANAAN AYAT PERSONA MAMA (THREADS: HAD KERAS <= 490 AKSARA)
 # ==============================================================================
 
 def clean_shopee_title(title: str, max_len: int = 35) -> str:
     """
-    Memotong tajuk pendek mengikut sempadan perkataan penuh.
+    Membuang emoji mentah, aksara Cina/asing, dan memotong tajuk pendek mengikut perkataan penuh.
     """
     if not title:
         return "Barang Rumah Praktikal"
-    cleaned = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", title)
+
+    # 1. Buang emoji mentah
+    emoji_pattern = re.compile(
+        "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
+        flags=re.UNICODE,
+    )
+    cleaned = emoji_pattern.sub("", title)
+
+    # 2. Buang aksara CJK & simbol kurungan
+    cleaned = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", cleaned)
     cleaned = re.sub(r"[【】\[\]()_~*#|/\\-]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
@@ -324,9 +361,7 @@ def clean_shopee_title(title: str, max_len: int = 35) -> str:
 
 
 def clean_ai_output(text: str) -> str:
-    """
-    Membersihkan tag pemikiran dan membuang emoji AI.
-    """
+    """Membersihkan tag pemikiran, menormalkan tanda baca, dan membuang emoji AI."""
     if not text:
         return ""
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
@@ -355,13 +390,11 @@ def clean_ai_output(text: str) -> str:
 
 
 def validate_threads_text(text: str) -> Tuple[bool, str]:
-    """
-    Menyemak kualiti teks ulasan Threads (fleksibel 70 hingga 250 aksara).
-    """
+    """Menyemak kualiti teks ulasan Threads (70 hingga 220 aksara)."""
     if not text or len(text) < 70:
         return False, f"Teks terlalu pendek ({len(text)} aksara, minima 70)."
-    if len(text) > 260:
-        return False, f"Teks terlalu panjang ({len(text)} aksara, maksima 260)."
+    if len(text) > 230:
+        return False, f"Teks terlalu panjang ({len(text)} aksara, maksima 230)."
 
     allowed_pattern = re.compile(r"^[a-zA-Z0-9\s.,!?'\"\–\—\-\(\)/%:;RMrm\n\r]+$")
     if not allowed_pattern.match(text):
@@ -371,22 +404,21 @@ def validate_threads_text(text: str) -> Tuple[bool, str]:
 
 
 def generate_fallback_threads_story(product_name: str) -> str:
-    """
-    Teks sandaran asas khas Threads jika AI gagal.
-    """
+    """Teks sandaran asas khas Threads jika AI gagal."""
     clean_name = clean_shopee_title(product_name, max_len=30)
-    return f"Senang betul nak bersihkan bulu kucing dan habuk melekat guna {clean_name} ni. Ringan, senang simpan kat laci dan sangat memudahkan kerja harian Mama."
+    return f"Mama suka betul guna {clean_name} ni. Sangat praktikal, ringan dan memudahkan kerja harian untuk kemaskan rumah kita."
 
 
 def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
     """
-    Menjana penceritaan santai Bahasa Melayu khas untuk Threads dengan nada Mama semula jadi.
-    Menggunakan rujukan visual ringkas untuk mengekalkan beban inferens yang ringan.
+    Menjana ulasan santai Bahasa Melayu bagi Threads dengan kefahaman masa MYT.
     """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title(raw_name, max_len=30)
+    brand = payload.get("shopee_brand", "Shopee Preferred")
     vision_en = payload.get("mama_english_review", "") or payload.get("visual_analysis_en", {}).get("summary_text", "")
     short_vision = vision_en[:180]
+    time_context, period = get_myt_time_context()
 
     endpoint_url, api_key, models, cfg_err = get_openrouter_config()
     if cfg_err or not models:
@@ -398,17 +430,29 @@ def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
     }
 
     system_prompt = (
-        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra dan suka bercerita santai.\n"
-        "Tugasan: Tulis 1 atau 2 ayat ulasan santai bersahaja suri rumah dalam BAHASA MELAYU MALAYSIA TULEN.\n\n"
-        "PANDUAN PENTING:\n"
-        "1. Gunakan nada perbualan mesra ('Mama suka betul...', 'Senang sangat...', 'Comel dan praktikal...').\n"
-        "2. JANGAN guna ayat terjemahan kaku seperti 'Saya melihat...', 'Berdasarkan gambar...', atau kosa kata janggal.\n"
-        "3. Panjang teks WAJIB di antara 120 hingga 180 aksara.\n"
-        "4. JANGAN sebut harga atau 'RM', JANGAN letak link/URL, JANGAN guna emoji.\n"
-        "5. Pastikan ayat lengkap diakhiri tanda noktah (.)."
+        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra, "
+        "santai, dan suka bercerita di Threads.\n\n"
+        "Tugasan Utama:\n"
+        "1. Teliti nama produk dan ulasan visual Bahasa Inggeris yang diberikan.\n"
+        "2. Olah nama produk menjadi lebih ringkas, menarik, dan selesa disebut dalam ulasan.\n"
+        "3. Tulis 1 atau 2 ayat ulasan santai bersahaja dalam Bahasa Melayu Malaysia tulen (sekitar 20 hingga 35 patah perkataan sahaja).\n"
+        "4. Selitkan sentuhan praktikal rumah yang selesa dan kemas.\n\n"
+        "Pantangan Ketat:\n"
+        "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang oleh kod).\n"
+        "- DILARANG letak pautan/URL Shopee di dalam ayat.\n"
+        "- DILARANG guna emoji sama sekali (emoji diuruskan oleh kod).\n"
+        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, yuk, bikin, gampang).\n"
+        "- Pastikan ayat diakhiri dengan tanda noktah yang lengkap.\n"
+        "- Terus berikan ayat ulasan tanpa sebarang mukadimah atau tag pemikiran."
     )
 
-    user_prompt = f"Produk: {clean_name}\nRujukan Ringkas: {short_vision}\nAyat ulasan santai Mama:"
+    user_prompt = (
+        f"Konteks Waktu Siaran: {time_context}\n"
+        f"Nama Asal Produk: {clean_name}\n"
+        f"Jenama: {brand}\n"
+        f"Rujukan Visual: {short_vision}\n\n"
+        f"Sila olah ulasan santai Mama untuk Threads:"
+    )
 
     for model_name in models:
         print(f"\n🧠 [AI THREADS] Mencuba Model: {model_name}...")
@@ -420,6 +464,7 @@ def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
+                    "temperature": 0.45,
                 }
                 res = requests.post(endpoint_url, headers=headers, json=post_payload, timeout=35)
                 if res.status_code == 200:
@@ -444,7 +489,7 @@ def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
 
 def assemble_threads_post(payload: Dict[str, Any], story_text: str) -> str:
     """
-    Menyusun kapsyen Threads lengkap dengan had ketat <= 490 aksara dan jarak baris yang kemas.
+    Menyusun kapsyen Threads lengkap dengan had keras <= 490 aksara.
     """
     raw_name = payload.get("shopee_product_name", "")
     short_title = clean_shopee_title(raw_name, max_len=30)
@@ -473,7 +518,7 @@ def assemble_threads_post(payload: Dict[str, Any], story_text: str) -> str:
 
 
 # ==============================================================================
-# 4. DISPATCHER & PENERBITAN THREADS API
+# 5. DISPATCHER & PENERBITAN THREADS API
 # ==============================================================================
 
 def post_to_threads_api(

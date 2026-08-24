@@ -1,5 +1,6 @@
 {
   "step": 2,
+<<<<<<< HEAD
   "shopee_product_id": "57902057167",
   "shopee_product_name": "YAKO Ceramic Mug with Lid Clean Cute Birthday Giftboxed Children Birthday Gift For Women Mug tumbler Cute Coffee Cup可爱杯子",
   "shopee_brand": "YAKO Official Store",
@@ -9,10 +10,22 @@
   "local_image_path": "/home/runner/work/Impian-Rumahku-Bot/Impian-Rumahku-Bot/temp/shopee_57902057167.jpg",
   "mama_english_review": "The YAKO ceramic mug features a smooth, glossy finish in pastel pink and creamy white, topped with a whimsical mushroomâshaped lid that doubles as a cozy cover. Its rounded handle and adorable face add charm, while the sturdy stoneware body keeps drinks warm. Presented in a checkered gift box, it serves as a stylish coffee cup, tea tumbler, or playful desk accessory, perfect for birthdays, housewarming, or everyday indulgence.",
   "review_char_count": 430,
+=======
+  "shopee_product_id": "26583606062",
+  "shopee_product_name": "♥READY STOCK Large-Capacity Cold Kettle with Faucet water jug dispenser bekas air kenduri Fruit Tea Cool Kettle Household Water Drink Bucket Ice Water Cup Dispenser",
+  "shopee_brand": "MY HomeLive",
+  "shopee_price": 19.5,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/cn-11134207-820l4-mnzg7q4zgxdv15",
+  "shopee_affiliate_link": "https://s.shopee.com.my/60R1Qx9MGS",
+  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_26583606062.jpg",
+  "mama_english_review": "Clear glass body with a sleek silver faucet and a warm wooden handle creates a modern yet rustic look; the large capacity holds infused water, iced tea or fruit punch, while the builtâin tap offers easy, messâfree serving. Perfect for kitchen counters, picnics, or camping, it keeps drinks cool and stylish all day.",
+  "review_char_count": 315,
+>>>>>>> 47e7df7 (feat(shopee): enhance AI persona generators with MYT-time awareness and emoji scrubbing)
   "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "post_results": {
     "facebook": {
       "status": "success",
+<<<<<<< HEAD
       "post_id": "1353740547811893_122100178503450068",
       "photo_id": "122100178473450068",
       "char_count": 524
@@ -40,4 +53,33 @@
     "bluesky": "✨ YAKO Ceramic Mug with Lid\n\nCawan YAKO berpenutup ini menawarkan permukaan licin berkilat yang indah, membantu menjaga minuman tetap panas sepanjang hari di rumah.\n\n💰 RM28.40\n🛒 Shopee: https://s.shopee.com.my/3B6q3kK918"
   },
   "created_at": "2026-08-23 23:23:25"
+=======
+      "post_id": "1353740547811893_122100210717450068",
+      "photo_id": "122100210687450068",
+      "char_count": 615
+    },
+    "threads": {
+      "status": "success",
+      "thread_id": "18107489705124492",
+      "char_count": 370
+    },
+    "instagram": {
+      "status": "success",
+      "media_id": "18140371696607707",
+      "char_count": 502
+    },
+    "bluesky": {
+      "status": "success",
+      "uri": "at://did:plc:nrwxc2ntoi3fmj3ihzbgroge/app.bsky.feed.post/3mtrzpvy57l2z",
+      "char_count": 248
+    }
+  },
+  "ai_captions": {
+    "facebook": "✨ READY STOCK Large Capacity Cold Kettle with Faucet w...\n\nPagi Isnin yang cerah, Bekas Air Sejuk MY HomeLive dengan Faucet ini adalah tambahan yang cantik untuk dapur. Dengan badan kaca jernih, faucet perak, dan handle kayu, ia kelihatan modern dan rustic. Kapasiti besar untuk teh buah atau infused water, tap yang mudah memudahkan serving. Sesuai untuk picnic atau camping, ia menjaga minuman sejuk sepanjang hari. Sangat praktis dan bergaya.\n\n💰 Harga Mesra Poket: RM19.50\n📌 Mama dah letak link barang ni di ruangan komen pertama di bawah ya! 👇\n\n#ImpianRumahku #CeritaMama #KemasRumah #TipsSuriRumah #RacunShopee",
+    "threads": "✨ READY STOCK Large Capacity\n\nRustic Glass Dispenser ni memang sesuai dengan kamar mandi yang kemas. Clear glass body dengan silver faucet dan wooden handle buatkan ia kelihatan modern tapi tetap selesa. Sangat sesuai untuk rumah yang mahu gaya natural.\n\n💰 Harga: RM19.50\n🛒 Shopee: https://s.shopee.com.my/60R1Qx9MGS\n\n\n#ImpianRumahku #CeritaMama #KemasRumah #RacunShopee",
+    "instagram": "✨ READY STOCK Large Capacity Cold\n\nMyHomeLive Cold Infuser\n\nBekas kaca bening ini dengan kran perak yang sleek dan gagang kayu hangat memang kelihatan cantik di meja dapur. Sangat sesuai untuk buat infus air, iced tea atau fruit punch, kapasitinya besar dan dengan tap yang terbina, very practical untuk hidangan sehari-hari.\n\n💰 Harga: RM19.50\n🛒 Link Shopee: https://s.shopee.com.my/60R1Qx9MGS\n\n#ImpianRumahku #CeritaMama #KemasRumah #DekoRumah #DekoDapur #RacunShopee #TipsSuriRumah #HomeDecorMalaysia",
+    "bluesky": "✨ ♥READY STOCK Large Capacity\n\nBadan kaca jernih dan kran perak licin dengan gagangan kayu hangat beri nuansa modern rustic, kapasiti besar pula memudahkan kita mengemas meja rapi tanpa repot.\n\n💰 RM19.50\n🛒 Shopee: https://s.shopee.com.my/60R1Qx9MGS"
+  },
+  "created_at": "2026-08-24 08:12:16"
+>>>>>>> 47e7df7 (feat(shopee): enhance AI persona generators with MYT-time awareness and emoji scrubbing)
 }
