@@ -1,26 +1,14 @@
 {
   "step": 2,
-<<<<<<< HEAD
-  "shopee_product_id": "57902057167",
-  "shopee_product_name": "YAKO Ceramic Mug with Lid Clean Cute Birthday Giftboxed Children Birthday Gift For Women Mug tumbler Cute Coffee Cup可爱杯子",
-  "shopee_brand": "YAKO Official Store",
-  "shopee_price": 28.4,
-  "shopee_picture_url": "https://down-my.img.susercontent.com/file/my-11134207-820l9-mhh3lm4r5fcw63",
-  "shopee_affiliate_link": "https://s.shopee.com.my/3B6q3kK918",
-  "local_image_path": "/home/runner/work/Impian-Rumahku-Bot/Impian-Rumahku-Bot/temp/shopee_57902057167.jpg",
-  "mama_english_review": "The YAKO ceramic mug features a smooth, glossy finish in pastel pink and creamy white, topped with a whimsical mushroomâshaped lid that doubles as a cozy cover. Its rounded handle and adorable face add charm, while the sturdy stoneware body keeps drinks warm. Presented in a checkered gift box, it serves as a stylish coffee cup, tea tumbler, or playful desk accessory, perfect for birthdays, housewarming, or everyday indulgence.",
-  "review_char_count": 430,
-=======
-  "shopee_product_id": "26583606062",
-  "shopee_product_name": "♥READY STOCK Large-Capacity Cold Kettle with Faucet water jug dispenser bekas air kenduri Fruit Tea Cool Kettle Household Water Drink Bucket Ice Water Cup Dispenser",
-  "shopee_brand": "MY HomeLive",
-  "shopee_price": 19.5,
-  "shopee_picture_url": "https://down-my.img.susercontent.com/file/cn-11134207-820l4-mnzg7q4zgxdv15",
-  "shopee_affiliate_link": "https://s.shopee.com.my/60R1Qx9MGS",
-  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_26583606062.jpg",
-  "mama_english_review": "Clear glass body with a sleek silver faucet and a warm wooden handle creates a modern yet rustic look; the large capacity holds infused water, iced tea or fruit punch, while the builtâin tap offers easy, messâfree serving. Perfect for kitchen counters, picnics, or camping, it keeps drinks cool and stylish all day.",
-  "review_char_count": 315,
->>>>>>> 47e7df7 (feat(shopee): enhance AI persona generators with MYT-time awareness and emoji scrubbing)
+  "shopee_product_id": "20076805463",
+  "shopee_product_name": "[20 PACKS]Botare Air-Cushion Tissue Paper 4-ply Facial Tissues Soft Face Tissue 175x155mm 360 sheet",
+  "shopee_brand": "Botare OFFICIAL STORE",
+  "shopee_price": 26.45,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/cn-11134207-7ras8-m2kqntsec8gj47",
+  "shopee_affiliate_link": "https://s.shopee.com.my/7KwP1DMbV5",
+  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_20076805463.jpg",
+  "mama_english_review": "Elegant orange boxes with crisp black lettering frame the soft white 4-ply Botare Air-Cushion tissues, each sheet measuring 175Ã155â¯mm. The sleek, minimalist packaging adds a pop of colour to any vanity, while the plush, durable sheets prove handy for facial cleansing, makeup removal, baby care, or everyday hand wipes, making this 20-pack set a stylish, versatile essential.",
+  "review_char_count": 377,
   "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "post_results": {
     "facebook": {
@@ -42,9 +30,5 @@
     "instagram": "",
     "bluesky": ""
   },
-<<<<<<< HEAD
-  "created_at": "2026-08-23 23:23:25"
-=======
-  "created_at": "2026-08-24 08:12:16"
->>>>>>> 47e7df7 (feat(shopee): enhance AI persona generators with MYT-time awareness and emoji scrubbing)
+  "created_at": "2026-08-24 08:35:18"
 }

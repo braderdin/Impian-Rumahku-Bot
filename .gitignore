@@ -224,3 +224,5 @@ __marimo__/
 .env.gh.example
 .env.example
 .archive/
+temp/shopee_payload.json
+temp/shopee_vision_ocr.json
