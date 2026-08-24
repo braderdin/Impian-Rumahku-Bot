@@ -1,43 +1,43 @@
 {
   "step": 2,
-  "shopee_product_id": "20076805463",
-  "shopee_product_name": "[20 PACKS]Botare Air-Cushion Tissue Paper 4-ply Facial Tissues Soft Face Tissue 175x155mm 360 sheet",
-  "shopee_brand": "Botare OFFICIAL STORE",
-  "shopee_price": 26.45,
-  "shopee_picture_url": "https://down-my.img.susercontent.com/file/cn-11134207-7ras8-m2kqntsec8gj47",
-  "shopee_affiliate_link": "https://s.shopee.com.my/7KwP1DMbV5",
-  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_20076805463.jpg",
-  "mama_english_review": "Elegant orange boxes with crisp black lettering frame the soft white 4-ply Botare Air-Cushion tissues, each sheet measuring 175Ã155â¯mm. The sleek, minimalist packaging adds a pop of colour to any vanity, while the plush, durable sheets prove handy for facial cleansing, makeup removal, baby care, or everyday hand wipes, making this 20-pack set a stylish, versatile essential.",
-  "review_char_count": 377,
+  "shopee_product_id": "43461729712",
+  "shopee_product_name": "lazy sofa swivel recliner balcony nap single lounge chair living room recliner home rotating leisure chair 旋转升降椅",
+  "shopee_brand": "LittleQueenz",
+  "shopee_price": 89.9,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/my-11134207-820ld-moul971i641u85",
+  "shopee_affiliate_link": "https://s.shopee.com.my/2qTzf5UsIM",
+  "local_image_path": "/home/runner/work/Impian-Rumahku-Bot/Impian-Rumahku-Bot/temp/shopee_43461729712.jpg",
+  "mama_english_review": "An elegant, creamâcolored corduroy swivel chair with a sleek dark wood base and plush, generously padded seat exudes cozy sophistication. Its 360Â° swivel and heightâadjustable steel base make it perfect for reading corners, balcony retreats, or a quick nap in the living room, offering effortless movement and durable, easyâcare comfort.",
+  "review_char_count": 338,
   "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "post_results": {
     "facebook": {
       "status": "success",
-      "post_id": "1353740547811893_122100220227450068",
-      "photo_id": "122100220203450068",
-      "char_count": 514
+      "post_id": "1353740547811893_122100223329450068",
+      "photo_id": "122100223305450068",
+      "char_count": 558
     },
     "threads": {
       "status": "success",
-      "thread_id": "18123320860874145",
-      "char_count": 296
+      "thread_id": "18110539229469238",
+      "char_count": 295
     },
     "instagram": {
       "status": "success",
-      "media_id": "18386317798165197",
-      "char_count": 366
+      "media_id": "18096952985624245",
+      "char_count": 445
     },
     "bluesky": {
       "status": "success",
-      "uri": "at://did:plc:nrwxc2ntoi3fmj3ihzbgroge/app.bsky.feed.post/3mts2v6q2tr2h",
-      "char_count": 187
+      "uri": "at://did:plc:nrwxc2ntoi3fmj3ihzbgroge/app.bsky.feed.post/3mts3hrgkfb2w",
+      "char_count": 200
     }
   },
   "ai_captions": {
-    "facebook": "✨ 20 PACKS Botare Air Cushion Tissue Paper 4 ply Facia...\n\nSelamat pagi ibu-ibu, tisu Botare yang lembut ni memang sesuai untuk rutin pagi-pagi kita. Dengan 4 lapis yang nipis tapi kuat, sesuai untuk bersih muka atau tangan anak. Kotak oren elegannya cantik letak di vanity, dan 20 pek stok ni memang cukup lama tahan untuk keluarga kecil kita.\n\n💰 Harga Mesra Poket: RM26.45\n📌 Mama dah letak link barang ni di ruangan komen pertama di bawah ya! 👇\n\n#ImpianRumahku #CeritaMama #KemasRumah #TipsSuriRumah #RacunShopee",
-    "threads": "✨ 20 PACKS Botare Air Cushion\n\nBotare Air Cushion tissue dengan kotak oren elegan ini cantik di rak kemas rumah. Tisu lembut 4-ply ini pasti buat keluarga Mama selesa setiap hari.\n\n💰 Harga: RM26.45\n🛒 Shopee: https://s.shopee.com.my/7KwP1DMbV5\n\n\n#ImpianRumahku #CeritaMama #KemasRumah #RacunShopee",
-    "instagram": "✨ 20 PACKS Botare Air Cushion Tissue\n\nBotare Air Cushion Tissue ini lembut dan tebal, sesuai untuk kulit sensitif. Kotaknya yang elegan turut menambahkan sentuhan kemas pada ruang di rumah.\n\n💰 Harga: RM26.45\n🛒 Link Shopee: https://s.shopee.com.my/7KwP1DMbV5\n\n#ImpianRumahku #CeritaMama #KemasRumah #DekoRumah #DekoDapur #RacunShopee #TipsSuriRumah #HomeDecorMalaysia",
-    "bluesky": "✨ 20 PACKS Botare Air\n\nBotare Air yang lembut 4-ply ini datang dalam 20 pek yang sesuai untuk kemas ruang storan rumah dengan rapi.\n\n💰 RM26.45\n🛒 Shopee: https://s.shopee.com.my/7KwP1DMbV5"
+    "facebook": "✨ lazy sofa swivel recliner balcony nap single lounge ...\n\nSelamat pagi! Aku baru-baru ini terjumpa LittleQueenz Swivel Recliner, dan aku suka dengan keselesaannya. Kerusi berwarna krim dengan bahan corduroy yang lembut dan penuh, tapak kayu gelap yang elegan. Ia boleh putar 360 darjah dan laras ketinggian, sesuai untuk sudut baca atau rehat sebentar. Sangat mudah alih dan tahan lasak.\n\n💰 Harga Mesra Poket: RM89.90\n📌 Mama dah letak link barang ni di ruangan komen pertama di bawah ya! 👇\n\n#ImpianRumahku #CeritaMama #KemasRumah #TipsSuriRumah #RacunShopee",
+    "threads": "✨ lazy sofa swivel recliner\n\nNi chair paling selesa untuk sudut baca tu, dengan bahan corduroy krim yang lembut dan putarannya yang smooth, sesuai gila duduk sambil minum petang.\n\n💰 Harga: RM89.90\n🛒 Shopee: https://s.shopee.com.my/2qTzf5UsIM\n\n\n#ImpianRumahku #CeritaMama #KemasRumah #RacunShopee",
+    "instagram": "✨ lazy sofa swivel recliner balcony\n\nKerusi swivel berwarna krim dengan korduroi yang lembut ini sangat selesa dan elegan untuk melengkapi hiasan rumah yang kemas. Dengan asas boleh laras dan putaran 360 darjah, ia sesuai untuk momen berehat di balkon atau ruang tamu.\n\n💰 Harga: RM89.90\n🛒 Link Shopee: https://s.shopee.com.my/2qTzf5UsIM\n\n#ImpianRumahku #CeritaMama #KemasRumah #DekoRumah #DekoDapur #RacunShopee #TipsSuriRumah #HomeDecorMalaysia",
+    "bluesky": "✨ lazy sofa swivel recliner\n\nKerusi sofa putar LittleQueenz yang berwarna krim dan lembut ini sangat praktikal untuk mengisi ruang dengan kemas.\n\n💰 RM89.90\n🛒 Shopee: https://s.shopee.com.my/2qTzf5UsIM"
   },
-  "created_at": "2026-08-24 08:35:18"
+  "created_at": "2026-08-24 00:44:21"
 }

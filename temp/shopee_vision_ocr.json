@@ -1,14 +1,14 @@
 {
   "step": 2,
-  "shopee_product_id": "20076805463",
-  "shopee_product_name": "[20 PACKS]Botare Air-Cushion Tissue Paper 4-ply Facial Tissues Soft Face Tissue 175x155mm 360 sheet",
-  "shopee_brand": "Botare OFFICIAL STORE",
-  "shopee_price": 26.45,
-  "shopee_picture_url": "https://down-my.img.susercontent.com/file/cn-11134207-7ras8-m2kqntsec8gj47",
-  "shopee_affiliate_link": "https://s.shopee.com.my/7KwP1DMbV5",
-  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/shopee_20076805463.jpg",
-  "mama_english_review": "Elegant orange boxes with crisp black lettering frame the soft white 4-ply Botare Air-Cushion tissues, each sheet measuring 175Ã155â¯mm. The sleek, minimalist packaging adds a pop of colour to any vanity, while the plush, durable sheets prove handy for facial cleansing, makeup removal, baby care, or everyday hand wipes, making this 20-pack set a stylish, versatile essential.",
-  "review_char_count": 377,
+  "shopee_product_id": "43461729712",
+  "shopee_product_name": "lazy sofa swivel recliner balcony nap single lounge chair living room recliner home rotating leisure chair 旋转升降椅",
+  "shopee_brand": "LittleQueenz",
+  "shopee_price": 89.9,
+  "shopee_picture_url": "https://down-my.img.susercontent.com/file/my-11134207-820ld-moul971i641u85",
+  "shopee_affiliate_link": "https://s.shopee.com.my/2qTzf5UsIM",
+  "local_image_path": "/home/runner/work/Impian-Rumahku-Bot/Impian-Rumahku-Bot/temp/shopee_43461729712.jpg",
+  "mama_english_review": "An elegant, creamâcolored corduroy swivel chair with a sleek dark wood base and plush, generously padded seat exudes cozy sophistication. Its 360Â° swivel and heightâadjustable steel base make it perfect for reading corners, balcony retreats, or a quick nap in the living room, offering effortless movement and durable, easyâcare comfort.",
+  "review_char_count": 338,
   "vision_model_used": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "post_results": {
     "facebook": {
@@ -30,5 +30,5 @@
     "instagram": "",
     "bluesky": ""
   },
-  "created_at": "2026-08-24 08:35:18"
+  "created_at": "2026-08-24 00:44:21"
 }
