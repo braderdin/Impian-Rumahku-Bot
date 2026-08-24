@@ -8,9 +8,6 @@ on:
     - cron: '17 0,3,6,9,12,15,16,18,20,21 * * *'
   workflow_dispatch: # Butang larian manual di tab Actions GitHub
 
-permissions:
-  contents: write # Membenarkan bot GitHub menolak commit JSON ke repositori
-
 jobs:
   auto-post-shopee-feed-job:
     runs-on: ubuntu-latest
@@ -18,10 +15,10 @@ jobs:
 
     steps:
       - name: 📥 Checkout Kod Repositori
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: 🐍 Konfigurasi Persekitaran Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -121,16 +118,12 @@ jobs:
         run: |
           python bin/run_shopee_audit_and_commit.py
 
-      - name: 💾 Commit & Push Fail Payload ke Repositori
+      - name: 📦 Muat Naik Fail Payload (Audit Artifact)
         if: always()
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f temp/shopee_payload.json temp/shopee_vision_ocr.json 2>/dev/null || true
-          if git diff --staged --quiet; then
-            echo "ℹ️ Tiada fail JSON baharu untuk dikomit."
-          else
-            git commit -m "chore(audit): update state payload [skip ci]"
-            git push origin main
-            echo "✅ Fail payload berjaya dikomit dan diselaraskan ke GitHub repositori."
-          fi
+        uses: actions/upload-artifact@v4
+        with:
+          name: shopee-audit-payload
+          path: |
+            temp/shopee_payload.json
+            temp/shopee_vision_ocr.json
+          retention-days: 7
