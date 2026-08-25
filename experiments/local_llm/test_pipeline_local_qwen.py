@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Test Pipeline Runner: Local Qwen 2.5 3B GGUF on GitHub Actions
+Test Pipeline Runner: Local Qwen 2.5 3B GGUF (Q5_K_M) + Telegram Photo Audit
 Location: experiments/local_llm/test_pipeline_local_qwen.py
 
 Pipeline Stages:
-1. Fetch candidate from Supabase (Unchanged status, no locking)
+1. Fetch candidate from Supabase & verify Redis (Unchanged status, no locking)
 2. Vision Analysis via OpenRouter Vision (Simple English A2/B1 review)
-3. Translation & Adaptation using Local Qwen 2.5 3B GGUF on CPU
-4. Detailed Telegram Audit Report (Comparison: English vs BM Translation)
+3. Translation & Adaptation using Local Qwen 2.5 3B (Q5_K_M GGUF) on CPU
+4. Detailed Telegram Audit with Product Photo (Comparison: English vs BM Translation)
 5. Strict Clean-up: NO posting to social media & NO database status locks (Redis/Supabase)
 """
 
@@ -44,7 +44,8 @@ def print_banner(text: str):
     print("═" * 78)
 
 
-def send_telegram_test_audit(
+def send_telegram_test_audit_with_photo(
+    local_image_path: str,
     product_name: str,
     brand: str,
     price: float,
@@ -57,7 +58,7 @@ def send_telegram_test_audit(
     char_count: int
 ) -> Tuple[bool, str]:
     """
-    Menghantar laporan perbandingan ulasan BI vs Terjemahan Qwen 2.5 3B ke Telegram.
+    Menghantar gambar produk bersama laporan perbandingan ulasan BI vs BM ke Telegram.
     """
     bot_token = (
         os.getenv("IRCM_TELEGRAM_BOT_TOKEN", "").strip()
@@ -72,24 +73,58 @@ def send_telegram_test_audit(
         return False, "Kredensial Telegram (BOT_TOKEN / CHAT_ID) tidak lengkap."
 
     caption = (
-        f"🧪 <b>[TEST BENCHMARK] Qwen 2.5 3B GGUF on CPU</b>\n"
+        f"🧪 <b>[TEST BENCHMARK] Qwen 2.5 3B (Q5_K_M GGUF) on CPU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📦 <b>Produk:</b> {product_name[:60]}...\n"
+        f"📦 <b>Produk:</b> {product_name[:55]}...\n"
         f"🏷️ <b>Jenama:</b> {brand} | 💰 <b>Harga:</b> RM{price:.2f}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"👁️ <b>1. Original Vision Review ({vision_model}):</b>\n"
         f"<i>\"{english_review}\"</i>\n"
         f"📏 <i>Panjang: {len(english_review)} aksara</i>\n\n"
-        f"🇲🇾 <b>2. Terjemahan & Olahan Qwen 2.5 3B BM:</b>\n"
+        f"🇲🇾 <b>2. Terjemahan & Olahan Qwen 2.5 3B (Q5_K_M) BM:</b>\n"
         f"\"{bm_review}\"\n"
-        f"📏 <i>Panjang: {char_count} aksara (Sasaran: 350-600)</i>\n\n"
+        f"📏 <i>Panjang: {char_count} aksara (Sasaran: 350-550)</i>\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⏱️ <b>Masa Inferens CPU:</b> {inference_sec:.2f} saat\n"
         f"🔗 <b>Link Produk:</b> {affiliate_link}\n"
-        f"🛡️ <i>Nota: Status pangkalan data TIDAK dikunci & Tiada hantaran ke media sosial.</i>"
+        f"🛡️ <i>Nota: Status DB TIDAK dikunci & Tiada post media sosial.</i>"
     )
 
-    send_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    # 1. Cuba hantar gambar fizikal bersama caption (Had Telegram Photo Caption: 1024 aksara)
+    if local_image_path and os.path.exists(local_image_path):
+        if len(caption) <= 1024:
+            send_photo_url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+            try:
+                with open(local_image_path, "rb") as photo_file:
+                    files = {"photo": photo_file}
+                    data = {
+                        "chat_id": chat_id,
+                        "caption": caption,
+                        "parse_mode": "HTML"
+                    }
+                    res = requests.post(send_photo_url, data=data, files=files, timeout=30)
+                    if res.status_code == 200:
+                        return True, "Gambar dan laporan audit berjaya dihantar ke Telegram!"
+            except Exception as e:
+                print(f"⚠️ [TELEGRAM PHOTO ERROR] {e}")
+
+        # Jika caption melebihi 1024 aksara, hantar foto dahulu kemudian teks penuh
+        else:
+            try:
+                send_photo_url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
+                short_cap = f"🧪 <b>[TEST BENCHMARK] {product_name[:50]}...</b>\n💰 RM{price:.2f} | 🏷️ {brand}"
+                with open(local_image_path, "rb") as photo_file:
+                    requests.post(
+                        send_photo_url,
+                        data={"chat_id": chat_id, "caption": short_cap, "parse_mode": "HTML"},
+                        files={"photo": photo_file},
+                        timeout=25
+                    )
+            except Exception:
+                pass
+
+    # 2. Fallback / Teks Penuh via sendMessage
+    send_msg_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": caption,
@@ -98,9 +133,9 @@ def send_telegram_test_audit(
     }
 
     try:
-        res = requests.post(send_url, json=payload, timeout=20)
+        res = requests.post(send_msg_url, json=payload, timeout=20)
         if res.status_code == 200:
-            return True, "Laporan berjaya dihantar ke Telegram!"
+            return True, "Laporan audit berjaya dihantar ke Telegram!"
         return False, f"Telegram API Error HTTP {res.status_code}: {res.text}"
     except Exception as e:
         return False, f"Ralat sambungan Telegram: {e}"
@@ -108,7 +143,7 @@ def send_telegram_test_audit(
 
 def run_local_qwen_test():
     start_total = time.time()
-    print_banner("Mula Ujian Saluran: Qwen 2.5 3B GGUF Local Translation Engine")
+    print_banner("Mula Ujian Saluran: Qwen 2.5 3B (Q5_K_M GGUF) Local Translation Engine")
 
     # -------------------------------------------------------------------------
     # STEP 1: PENGAMBILAN PRODUK SHOPEE
@@ -139,11 +174,12 @@ def run_local_qwen_test():
 
     print(f"   ✔ Model Vision Digunakan: {vision_model_used}")
     print(f"   ✔ Ulasan Asal BI ({len(english_review)} aksara):\n     \"{english_review}\"")
+    print(f"   ✔ Fail Imej Fizikal: {local_img_path}")
 
     # -------------------------------------------------------------------------
-    # STEP 3: OLAHAN TERJEMAHAN LOCAL LLM (QWEN 2.5 3B GGUF)
+    # STEP 3: OLAHAN TERJEMAHAN LOCAL LLM (QWEN 2.5 3B Q5_K_M GGUF)
     # -------------------------------------------------------------------------
-    print("\n🇲🇾 [STEP 3] Menjana Olahan BM Menggunakan Qwen 2.5 3B GGUF (CPU)...")
+    print("\n🇲🇾 [STEP 3] Menjana Olahan BM Menggunakan Qwen 2.5 3B (Q5_K_M GGUF)...")
     bm_review, inf_time, char_count = translate_and_adapt_to_mama_bm(
         product_name=product_name,
         brand=brand,
@@ -158,10 +194,11 @@ def run_local_qwen_test():
     print(f"📊 Statistik: {char_count} aksara | Masa inferens: {inf_time:.2f} saat")
 
     # -------------------------------------------------------------------------
-    # STEP 4: HANTAR LAPORAN AUDIT KE TELEGRAM
+    # STEP 4: HANTAR LAPORAN AUDIT KE TELEGRAM (GAMBAR + TEKS)
     # -------------------------------------------------------------------------
-    print("\n📲 [STEP 4] Menghantar Laporan Ujian Perbandingan ke Telegram...")
-    tg_ok, tg_msg = send_telegram_test_audit(
+    print("\n📲 [STEP 4] Menghantar Laporan Ujian Bergambar ke Telegram...")
+    tg_ok, tg_msg = send_telegram_test_audit_with_photo(
+        local_image_path=local_img_path,
         product_name=product_name,
         brand=brand,
         price=price,

@@ -22,9 +22,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface/hub
-          key: ${{ runner.os }}-hf-qwen-3b-gguf-v1
+          key: ${{ runner.os }}-hf-qwen-3b-q5km-v1
           restore-keys: |
-            ${{ runner.os }}-hf-qwen-3b-gguf-
+            ${{ runner.os }}-hf-qwen-3b-q5km-
 
       # Cache wheel & package pip
       - name: Pulihkan / Simpan Cache Pip
