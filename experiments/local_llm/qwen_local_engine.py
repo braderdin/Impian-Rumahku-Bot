@@ -25,7 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 REPO_ID = "Qwen/Qwen2.5-3B-Instruct-GGUF"
-MODEL_FILENAME = "qwen2.5-3b-instruct-q4_k_m.gguf"
+MODEL_FILENAME = "qwen2.5-3b-instruct-q5_k_m.gguf"
 
 _LLM_INSTANCE = None
 
