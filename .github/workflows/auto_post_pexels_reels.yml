@@ -50,7 +50,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 🚀 Run Master Reels Pipeline
+      - name: 🎬 Run Master Reels Pipeline
         env:
           # 1. OpenRouter AI Persona
           IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}

@@ -21,7 +21,17 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: '3.11'
-          cache: 'pip'
+          
+      # Baca Cache Pip & Model Hugging Face Sedia Ada
+      - name: ⚡ Pulihkan Cache Pip & Hugging Face
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-ircm-cache-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-ircm-cache-
 
       - name: 📦 Pasang Pustaka Python
         run: |
