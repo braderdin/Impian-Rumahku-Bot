@@ -5,6 +5,7 @@ Impian Rumahku Ecosystem (Step 3 & 4 Facebook Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
 - Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural storytelling
+- Short Friendly Moniker: Extracts clean everyday product name and weaves function naturally
 - Title Cleaner: Removes raw emojis and foreign CJK characters automatically
 - Raw Payload: No max_tokens restriction for fluid, unclipped completions
 - Post Length: Target 500 - 750 characters total post caption
@@ -183,8 +184,8 @@ def validate_text_quality(text: str) -> Tuple[bool, str]:
     """
     Menyemak kualiti teks AI (panjang teks dan abjad standard).
     """
-    if not text or len(text) < 180:
-        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 180)."
+    if not text or len(text) < 160:
+        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 160)."
 
     allowed_pattern = re.compile(r"^[a-zA-Z0-9\s.,!?'\"\–\—\-\(\)/%:;RMrm\n\r]+$")
     if not allowed_pattern.match(text):
@@ -207,17 +208,17 @@ def generate_fallback_fb_story(product_name: str, brand: str) -> str:
     Ulasan santai persona Mama sandaran jika panggilan AI tergendala.
     """
     clean_name = clean_shopee_title_for_prompt(product_name)
+    short_name = clean_name.split("|")[0].split("-")[0].strip()[:35]
     return (
-        f"Mama nak kongsi satu penemuan praktikal untuk kemaskan rumah kita iaitu {clean_name[:35]}. "
-        f"Barang daripada {brand} ni memang memudahkan urusan harian suri rumah. "
-        f"Senang nak guna, ringan, dan sangat membantu bila nak kemaskan ruang rumah tanpa rasa renyah. "
-        f"Rekaan yang kemas dan kukuh ni memang elok ada untuk kegunaan harian sekeluarga."
+        f"Bila ruang rumah mula bersepah atau kerja harian terasa renyah, memang lega sangat bila ada {short_name} ni. "
+        f"Barang daripada {brand} ni sangat praktikal, mudah digunakan dan membantu memudahkan urusan harian keluarga. "
+        f"Ruang pun nampak lebih tersusun kemas dan sedap mata memandang tanpa pening kepala."
     )
 
 
 def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
     """
-    Menghasilkan ulasan santai Bahasa Melayu bagi Facebook dengan kefahaman masa MYT.
+    Menghasilkan ulasan santai Bahasa Melayu bagi Facebook dengan kefahaman masa MYT & nama produk mesra.
     """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title_for_prompt(raw_name)
@@ -237,19 +238,21 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
     }
 
     system_prompt = (
-        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang peramah, "
-        "bijak, dan suka berkongsi idea hiasan serta kemas rumah bersama rakan media sosial.\n\n"
+        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah Malaysia yang peramah, "
+        "praktikal, dan suka berkongsi barang rumah berguna di Facebook.\n\n"
         "Tugasan Utama:\n"
-        "1. Teliti nama produk dan ulasan visual Bahasa Inggeris yang diberikan.\n"
-        "2. Olah nama produk menjadi lebih ringkas, menarik, dan selesa disebut dalam ulasan.\n"
-        "3. Tulis 1 perenggan ulasan santai dalam Bahasa Melayu Malaysia tulen (sekitar 40 hingga 65 patah perkataan).\n"
-        "4. Sesuaikan sedikit nada pembuka mengikut waktu siaran jika sesuai.\n\n"
+        "1. Fahami fungsi utama produk daripada tajuk dan rujukan visual English yang diberikan.\n"
+        "2. Ringkaskan tajuk panjang Shopee kepada panggilan harian yang mesra dan pendek dalam ayat (contoh: 'tisu basah dapur ni', 'rak rempah bertingkat ni', 'mesin rumput bateri ni', 'tumbler tahan sejuk ni').\n"
+        "3. Tulis 1 perenggan ulasan santai gaya Mama dalam Bahasa Melayu Malaysia tulen (sekitar 40 hingga 65 patah perkataan).\n"
+        "4. Mulakan dengan situasi harian atau masalah yang diselesaikan (contoh: bila dapur berminyak / barang bersepah / nak kemaskan ruang) dan jelaskan bagaimana barang ini memudahkan kerja rumah.\n"
+        "5. Masukkan panggilan ringkas produk tadi secara natural dalam penceritaan sebagai promosi lembut.\n\n"
         "Pantangan Ketat:\n"
-        "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang automatik oleh sistem).\n"
+        "- DILARANG sebut harga atau sebut 'RM' (sistem akan pasang harga automatik).\n"
         "- DILARANG letak sebarang URL atau pautan Shopee di dalam ayat.\n"
-        "- DILARANG guna emoji sama sekali (emoji diuruskan oleh kod).\n"
-        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, yuk, bikin, gampang).\n"
-        "- Pastikan perenggan diakhiri dengan tanda noktah yang lengkap.\n"
+        "- DILARANG letak sebarang emoji sama sekali (kod python akan letak emoji).\n"
+        "- DILARANG guna bahasa Indonesia (haramkan perkataan: bisa, banget, nggak, ngak, yuk, bikin, gampang, cobain).\n"
+        "- Gunakan istilah harian Melayu (contoh: senang nak lap, kemas terletak, tak serabut mata, jimat ruang, tak pening kepala).\n"
+        "- Pastikan perenggan lengkap dan berakhir dengan tanda noktah (.).\n"
         "- Terus berikan teks ulasan tanpa sebarang mukadimah atau tag pemikiran."
     )
 
@@ -257,8 +260,8 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
         f"Konteks Waktu Siaran: {time_context}\n"
         f"Nama Asal Produk: {clean_name}\n"
         f"Jenama: {brand}\n"
-        f"Rujukan Visual: {vision_en}\n\n"
-        f"Sila olah ulasan santai Mama dalam Bahasa Melayu Malaysia:"
+        f"Rujukan Visual (English Mudah): {vision_en}\n\n"
+        f"Sila olah ulasan santai Facebook Mama (pendekkan tajuk jadi panggilan mesra dalam ayat):"
     )
 
     for model_name in models:

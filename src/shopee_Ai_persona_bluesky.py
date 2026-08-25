@@ -5,8 +5,9 @@ Impian Rumahku Ecosystem (Step 3 & 4 Bluesky Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
 - Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural storytelling
+- Short Friendly Moniker: Weaves punchy practical hook & everyday product name in 1 sentence
 - Title Cleaner: Strips raw emojis, CJK symbols, and brackets automatically
-- Strict Micro-storytelling: ~15 to 25 words for Mama review body
+- Strict Micro-storytelling: ~15 to 25 words (1 single punchy sentence)
 - Temperature: 0.40 without max_tokens constraint
 - Hard safety cap: Strictly <= 280 characters total (AT-Protocol post limit)
 - AT-Protocol native session authentication & direct binary blob image upload
@@ -182,9 +183,9 @@ def clean_ai_output(text: str) -> str:
 
 
 def validate_bluesky_micro_text(text: str) -> Tuple[bool, str]:
-    """Menyemak kualiti teks mikro ulasan Bluesky (50 hingga 160 aksara)."""
-    if not text or len(text) < 50:
-        return False, f"Teks terlalu pendek ({len(text)} aksara)."
+    """Menyemak kualiti teks mikro ulasan Bluesky (40 hingga 160 aksara)."""
+    if not text or len(text) < 40:
+        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 40)."
     if len(text) > 165:
         return False, f"Teks terlalu panjang untuk Bluesky ({len(text)} aksara)."
 
@@ -198,16 +199,19 @@ def validate_bluesky_micro_text(text: str) -> Tuple[bool, str]:
 def generate_fallback_bluesky_story(product_name: str) -> str:
     """Teks sandaran mikro khas Bluesky sekiranya panggilan AI gagal."""
     clean_name = clean_shopee_title(product_name, max_len=24)
-    return f"Mama suka betul guna {clean_name} ni. Ringan, praktikal dan sangat memudahkan kerja harian kemaskan rumah."
+    short_name = clean_name.split("|")[0].split("-")[0].strip()[:24]
+    return f"Senang betul kerja harian bila ada {short_name} ni kat rumah sebab praktikal dan jimat masa."
 
 
 def generate_mama_bluesky_copy(payload: Dict[str, Any]) -> str:
-    """Menjana penceritaan mikro BM Persona Mama (15-25 patah perkataan) dengan masa MYT."""
+    """
+    Menjana penceritaan mikro BM Persona Mama tepat 1 ayat padu (15-25 patah perkataan).
+    """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title(raw_name, max_len=26)
     brand = payload.get("shopee_brand", "Shopee Preferred")
     vision_en = payload.get("mama_english_review", "") or payload.get("visual_analysis_en", {}).get("summary_text", "")
-    short_vision = vision_en[:120]
+    short_vision = vision_en[:140]
     time_context, _ = get_myt_time_context()
 
     endpoint_url, api_key, models, cfg_err = get_openrouter_config()
@@ -220,17 +224,20 @@ def generate_mama_bluesky_copy(payload: Dict[str, Any]) -> str:
     }
 
     system_prompt = (
-        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang peramah dan bersahaja di Bluesky.\n\n"
+        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra "
+        "dan bersahaja berkongsi barang praktikal di Bluesky.\n\n"
         "Tugasan Utama:\n"
-        "1. Teliti nama produk dan ulasan visual Bahasa Inggeris.\n"
-        "2. Tulis TEPAT 1 ayat mikro ulasan santai dalam Bahasa Melayu Malaysia tulen (sekitar 15 hingga 25 patah perkataan sahaja).\n"
-        "3. Tekankan kemudahan praktikal produk untuk kemas ruang rumah.\n\n"
+        "1. Fahami fungsi utama produk daripada tajuk dan rujukan visual English yang diberikan.\n"
+        "2. Ringkaskan tajuk Shopee menjadi nama panggilan harian yang pendek (contoh: 'tisu basah dapur ni', 'rak rempah ni', 'tumbler ni', 'cermin mini ni').\n"
+        "3. Tulis TEPAT 1 ayat mikro ulasan santai dan padu dalam Bahasa Melayu Malaysia tulen (sekitar 15 hingga 25 patah perkataan sahaja).\n"
+        "4. Hubungkan situasi/masalah rumah dengan kelebihan barang tersebut secara bersahaja dan meyakinkan.\n\n"
         "Pantangan Ketat:\n"
-        "- DILARANG sebut harga atau 'RM'.\n"
-        "- DILARANG letak sebarang link/URL.\n"
-        "- DILARANG letak emoji.\n"
-        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, yuk, bikin, gampang).\n"
-        "- Pastikan ayat lengkap diakhiri tanda noktah (.).\n"
+        "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang oleh kod).\n"
+        "- DILARANG letak sebarang link atau URL Shopee.\n"
+        "- DILARANG letak emoji sama sekali (kod python akan masukkan emoji).\n"
+        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, ngak, yuk, bikin, gampang, cobain).\n"
+        "- Gunakan frasa Melayu natural (contoh: senang nak guna, jimat masa, kemas elok, tak serabut).\n"
+        "- Pastikan tepat 1 ayat lengkap yang berakhir dengan tanda noktah (.).\n"
         "- Terus berikan teks ulasan tanpa mukadimah atau tag pemikiran."
     )
 
@@ -238,8 +245,8 @@ def generate_mama_bluesky_copy(payload: Dict[str, Any]) -> str:
         f"Konteks Waktu: {time_context}\n"
         f"Produk: {clean_name}\n"
         f"Jenama: {brand}\n"
-        f"Rujukan Visual: {short_vision}\n\n"
-        f"Sila olah mikro ulasan Mama untuk Bluesky:"
+        f"Rujukan Visual (English Mudah): {short_vision}\n\n"
+        f"Sila olah tepat 1 ayat padu Bluesky Mama (ringkaskan tajuk jadi nama panggilan dalam ayat):"
     )
 
     for model_name in models:

@@ -5,9 +5,10 @@ Impian Rumahku Ecosystem (Step 3 & 4 Instagram Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
 - Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural lifestyle tone
+- Short Friendly Moniker: Extracts clean everyday product name and weaves neat home living aesthetics
 - Title Cleaner: Removes raw emojis, CJK symbols, and brackets automatically
 - Raw Payload: No max_tokens restriction for fluid, unclipped completions
-- Post Length: Target 400 - 600 characters total post caption
+- Post Length: Target 400 - 600 characters total post caption (Story: 30 - 45 words, 2 sentences)
 - Private Ephemeral B2 Hosting: 3x Upload & Pod Re-fetch Retry Loop (Signed 600s URL -> Auto Delete)
 - 2-Stage Instagram Graph API Container Creation & Publishing
 - AI Cascading: Primary (2x) -> Fallback 1 (2x) -> Fallback 2 (2x) -> Rule-based fallback
@@ -358,9 +359,9 @@ def clean_ai_output(text: str) -> str:
 
 
 def validate_instagram_text(text: str) -> Tuple[bool, str]:
-    """Menyemak kualiti teks ulasan Instagram (120 hingga 300 aksara)."""
-    if not text or len(text) < 120:
-        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 120)."
+    """Menyemak kualiti teks ulasan Instagram (110 hingga 300 aksara)."""
+    if not text or len(text) < 110:
+        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 110)."
     if len(text) > 300:
         return False, f"Teks terlalu panjang ({len(text)} aksara, maksima 300)."
 
@@ -374,15 +375,16 @@ def validate_instagram_text(text: str) -> Tuple[bool, str]:
 def generate_fallback_instagram_story(product_name: str, brand: str) -> str:
     """Teks sandaran asas khas Instagram jika AI gagal."""
     clean_name = clean_shopee_title(product_name, max_len=30)
+    short_name = clean_name.split("|")[0].split("-")[0].strip()[:30]
     return (
-        f"Mama nak kongsi satu lagi penemuan berguna untuk kemaskan rumah kita iaitu {clean_name}. "
-        f"Barang daripada {brand} ni memang praktikal, senang nak guna dan memudahkan urusan harian keluarga."
+        f"Mama suka tengok ruang rumah tersusun rapi dengan {short_name} ni. "
+        f"Barang daripada {brand} ni sangat praktikal, kemas terletak dan memudahkan kerja harian kita sekeluarga."
     )
 
 
 def generate_mama_instagram_copy(payload: Dict[str, Any]) -> str:
     """
-    Menjana ulasan santai Bahasa Melayu bagi Instagram Feed dengan kefahaman masa MYT.
+    Menjana ulasan santai Bahasa Melayu bagi Instagram Feed dengan penceritaan gaya hidup kemas.
     """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title(raw_name, max_len=35)
@@ -401,27 +403,30 @@ def generate_mama_instagram_copy(payload: Dict[str, Any]) -> str:
     }
 
     system_prompt = (
-        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra dan suka berkongsi idea hiasan/kemas rumah di Instagram.\n\n"
+        "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra "
+        "dan suka berkongsi idea ruang rumah yang kemas serta tenang di Instagram Feed.\n\n"
         "Tugasan Utama:\n"
-        "1. Teliti nama produk dan ulasan visual Bahasa Inggeris yang diberikan.\n"
-        "2. Olah nama produk menjadi lebih ringkas, menarik, dan selesa disebut dalam penceritaan.\n"
-        "3. Tulis tepat 2 ayat ulasan santai bersahaja dalam Bahasa Melayu Malaysia tulen (sekitar 30 hingga 45 patah perkataan sahaja).\n"
-        "4. Selitkan sentuhan gaya hidup rumah yang kemas dan praktikal.\n\n"
+        "1. Fahami fungsi produk daripada tajuk dan rujukan visual English yang diberikan.\n"
+        "2. Ringkaskan tajuk panjang Shopee kepada panggilan harian yang mesra (contoh: 'tisu basah dapur ni', 'rak rempah bertingkat ni', 'tumbler comel ni', 'alas kaki serap air ni').\n"
+        "3. Tulis TEPAT 2 ayat ulasan santai dalam Bahasa Melayu Malaysia tulen (sekitar 30 hingga 45 patah perkataan sahaja).\n"
+        "4. Fokuskan ayat pertama pada kemudahan atau suasana kemas, dan ayat kedua pada praktikaliti harian.\n"
+        "5. Masukkan panggilan mesra produk tadi secara semula jadi dalam ayat sebagai promosi lembut.\n\n"
         "Pantangan Ketat:\n"
-        "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang oleh sistem).\n"
-        "- DILARANG letak sebarang pautan atau URL Shopee.\n"
+        "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang automatik oleh kod).\n"
+        "- DILARANG letak sebarang pautan atau URL Shopee di dalam ayat.\n"
         "- DILARANG guna emoji sama sekali (kod python akan masukkan emoji).\n"
-        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, yuk, bikin, gampang).\n"
-        "- Pastikan ayat diakhiri dengan tanda noktah yang lengkap.\n"
-        "- Terus berikan ayat ulasan tanpa mukadimah atau tag pemikiran."
+        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, ngak, yuk, bikin, gampang, cobain).\n"
+        "- Gunakan bahasa Melayu natural (contoh: senang nak guna, kemas terletak, sedap mata memandang, jimat masa).\n"
+        "- Pastikan tepat 2 ayat lengkap dan diakhiri dengan tanda noktah (.).\n"
+        "- Terus berikan teks ulasan tanpa mukadimah atau tag pemikiran."
     )
 
     user_prompt = (
         f"Konteks Waktu Siaran: {time_context}\n"
         f"Nama Asal Produk: {clean_name}\n"
         f"Jenama: {brand}\n"
-        f"Rujukan Visual: {short_vision}\n\n"
-        f"Sila olah ulasan santai Mama untuk Instagram Feed:"
+        f"Rujukan Visual (English Mudah): {short_vision}\n\n"
+        f"Sila olah tepat 2 ayat ulasan santai Instagram Mama (pendekkan tajuk jadi panggilan mesra):"
     )
 
     for model_name in models:

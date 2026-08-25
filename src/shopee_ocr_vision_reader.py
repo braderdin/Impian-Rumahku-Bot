@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Shopee Vision & Mama English Persona Review Engine (Chic & Lightweight Edition)
+Shopee Vision & Mama English Persona Review Engine (Simple Plain English Edition)
 Impian Rumahku Ecosystem (Step 2 Pipeline)
 Features:
 - Encodes compressed JPEG image (<60KB) to prevent socket timeouts
-- Persona: Educated 30-something English lifestyle creator (sharp, versatile insights)
+- Persona: Friendly practical home organizer (Simple, direct Plain English A2/B1)
+- Focus: Visible materials/colors + real practical daily uses (easy for small LLMs to translate)
 - Strict character limit: strictly <= 500 characters total
 - Mojibake & Glitch Scrubber: cleans corrupted UTF-8 byte encodings
 - Removes max_tokens constraint from request payload
@@ -162,12 +163,12 @@ def compress_and_encode_image(file_path: str, max_size: int = 512, quality: int 
 
 def generate_fallback_mama_english(product_name: str, brand: str, price: float) -> str:
     """
-    Ulasan sandaran Bahasa Inggeris bergaya dan ringkas jika Vision API gagal.
+    Ulasan sandaran Bahasa Inggeris mudah (Plain English A2/B1) jika Vision API gagal.
     """
     return (
-        f"I really admire the thoughtful design and versatile utility of this {product_name[:40]} from {brand}. "
-        f"It effortlessly combines practical everyday functionality with a clean, modern aesthetic. "
-        f"At only RM{price:.2f}, it is a delightful and budget-friendly upgrade for keeping spaces tidy and organized."
+        f"This {product_name[:35]} from {brand} is very useful for everyday home use. "
+        f"It has a clean and practical design that helps keep things neat and well organized. "
+        f"It is lightweight, easy to use, and very convenient for daily family routines."
     ).strip()
 
 
@@ -177,7 +178,7 @@ def analyze_product_image_with_vision(
     delay_seconds: int = 2
 ) -> Dict[str, Any]:
     """
-    Step 2: Enjin Vision Persona Wanita English Terpelajar (Maksimum 500 aksara).
+    Step 2: Enjin Vision Bahasa Inggeris Mudah & Praktikal (Maksimum 500 aksara).
     """
     product_id = str(product.get("shopee_product_id") or product.get("product_id") or "").strip()
     product_name = str(product.get("shopee_product_name") or product.get("product_name") or "").strip()
@@ -206,18 +207,20 @@ def analyze_product_image_with_vision(
             "Content-Type": "application/json",
         }
 
-        # Prompt Persona Wanita Terpelajar 30-an (Fokus Visual & Kepelbagaian Kegunaan)
+        # Prompt Persona Practical Home Organizer (Simple Plain English A2/B1)
         system_prompt = (
-            "You are an articulate, educated 30-something English lifestyle creator and social media curator.\n"
-            "Your style is vibrant, clever, chic, and observant. You love sharing versatile home and lifestyle finds.\n\n"
+            "You are a friendly home organizer who reviews practical home and daily lifestyle products.\n"
+            "You write in simple, clear, and direct Plain English (Level A2/B1). Never use poetic or difficult words.\n\n"
             "TASK:\n"
-            "Look closely at the product photo and title. Write a polished, engaging micro-review in ENGLISH.\n"
-            "Describe the visible aesthetic (colors, materials, form factor) and explain its versatile practical uses in daily living.\n\n"
+            "Look closely at the product photo and title. Write a simple, direct review in Plain English (under 450 characters).\n"
+            "Cover 2 simple points:\n"
+            "1. Visible Details: What color, shape, or material is visible in the photo.\n"
+            "2. Practical Function: What is this product used for, and how does it make home chores easier or keep things neat.\n\n"
             "STRICT RULES:\n"
-            "1. Write strictly in natural, eloquent ENGLISH.\n"
-            "2. Total length MUST be between 250 and 500 characters.\n"
-            "3. Focus on real visual details and smart versatile utility.\n"
-            "4. NEVER include URLs, affiliate links, hashtags, emojis, or conversational intros.\n"
+            "1. Use simple everyday words (e.g., 'easy to clean', 'saves space', 'keeps neat', 'strong plastic', 'lightweight').\n"
+            "2. DO NOT use complex words like 'aesthetic demeanor', 'versatile utility', 'seamlessly', 'elevate', 'curated'.\n"
+            "3. Total length MUST be strictly under 500 characters.\n"
+            "4. NEVER include URLs, affiliate links, prices, hashtags, emojis, or greetings.\n"
             "5. Return ONLY the review paragraph with clean punctuation."
         )
 
@@ -228,7 +231,7 @@ def analyze_product_image_with_vision(
                     f"Product Title: {product_name}\n"
                     f"Brand: {product_brand}\n"
                     f"Price: RM{locked_price:.2f}\n\n"
-                    f"Write your versatile visual review in English (strictly under 500 characters):"
+                    f"Write a simple, clear visual and practical review in Plain English (under 450 characters):"
                 ),
             },
             {
@@ -237,7 +240,6 @@ def analyze_product_image_with_vision(
             },
         ]
 
-        # Payload ringan tanpa had max_tokens manual
         payload = {
             "model": model_name,
             "messages": [
@@ -256,7 +258,7 @@ def analyze_product_image_with_vision(
                     raw_text = res_json.get("choices", [{}])[0].get("message", {}).get("content", "")
                     clean_text = clean_and_scrub_vision_text(raw_text)
 
-                    if len(clean_text) >= 180:
+                    if len(clean_text) >= 140:
                         mama_english_review = clean_text
                         used_model = model_name
                         is_fallback = False
@@ -331,10 +333,10 @@ if __name__ == "__main__":
     print("=" * 70)
 
     sample_candidate = {
-        "shopee_product_id": "22355433182",
-        "shopee_product_name": "Scentify Fabric Perfume Sparkling Fruite 370ml | 2X Long-Lasting",
-        "shopee_brand": "Wipro Unza Official Store",
-        "shopee_price": 9.50,
+        "shopee_product_id": "24101317984",
+        "shopee_product_name": "[80Pcs]Kitchen Wipes Blue Grey 80 Sheets Cleaning Wet Tissue Pembersih Dapur Minyak",
+        "shopee_brand": "Simsue Official Store",
+        "shopee_price": 18.90,
         "shopee_picture_url": "https://down-my.img.susercontent.com/file/my-11134207-7rash-mam2t6c3p0rv4e",
         "shopee_affiliate_link": "https://s.shopee.com.my/4VcDe9OWtV",
     }

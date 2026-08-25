@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 """
-Shopee Auto-Poster Pipeline: Master Local End-to-End Test Runner
+Shopee Auto-Poster Pipeline: Master Local End-to-End Diagnostic & Test Runner
 Location: bin/run_shopee_all_step_test.py
 
 Pipeline Sequence:
-- Step 0: Pre-Flight Environment & Configuration Check (IRCM_* Priority)
-- Step 1: Fetch candidate from Supabase & filter via Upstash Redis/Vector DB
-- Step 2: Download image & generate Mama English Vision Review (IRCM_MODEL_VISION)
-- Step 3A: Post to Facebook Page Feed & dispatch affiliate link in first comment
-- Step 3B: Upload ephemeral B2 signed image & post to Instagram Feed
-- Step 3C: Upload ephemeral B2 signed image & post to Meta Threads Feed (Redis token)
-- Step 3D: Direct binary blob upload & post to Bluesky Feed with link facets
-- Step 4 - 8: Telegram audit card, Safety Gatekeeper, Redis/Vector/Supabase commit & cleanup
+- Step 0: Pre-Flight Environment & Secret Check (IRCM_* Priority)
+- Step 1: Fetch candidate from Supabase & filter via Upstash Redis (30d) / Vector DB (2d)
+- Step 2: Download image & generate Vision Review in Simple English (Plain English A2/B1)
+- Step 3: AI Copywriter Persona Mama BM Translations & Captions Generation:
+  * 3A: Facebook Page Post & 1st Comment (500 - 750 chars)
+  * 3B: Instagram Feed Caption (400 - 600 chars)
+  * 3C: Meta Threads Caption (<= 490 chars)
+  * 3D: Bluesky Micro-post (<= 280 chars)
+- Step 4: Interactive Mode Selection:
+  * [1] LIVE POST  - Hantar ke Facebook, Instagram, Threads, dan Bluesky sebenar.
+  * [2] DRY RUN    - Simulasi sahaja (tidak pos ke media sosial sebenar).
+- Step 5: Telegram Summary Card & Audit Report
+- Step 6: Database Locking (Redis, Vector, Supabase) & Temporary Cleanup
 """
 
 import os
+import re
 import sys
 import json
 import time
-import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -34,10 +39,47 @@ if env_local.exists():
 else:
     load_dotenv()
 
+# Import Teras dari src/ & bin/
+try:
+    from src.shopee_ocr_vision_reader import analyze_product_image_with_vision
+    from src.shopee_Ai_persona_fb import generate_mama_fb_copy, assemble_fb_post_and_comment, post_to_facebook_page
+    from src.shopee_Ai_persona_instagram import (
+        generate_mama_instagram_copy, assemble_instagram_post, post_to_instagram_feed,
+        upload_temp_image_to_b2_signed as upload_ig_b2, delete_ephemeral_image_from_b2 as delete_ig_b2
+    )
+    from src.shopee_Ai_persona_threads import (
+        generate_mama_threads_copy, assemble_threads_post, post_to_threads_api, get_threads_config,
+        upload_temp_image_to_b2_signed as upload_th_b2, delete_ephemeral_image_from_b2 as delete_th_b2
+    )
+    from src.shopee_Ai_persona_bluesky import generate_mama_bluesky_copy, assemble_bluesky_post, post_to_bluesky
+    from src.shopee_telegram_audit import send_shopee_audit_report, has_successful_post
+    from src.shopee_redis_filter import mark_shopee_product_posted
+    from src.shopee_vector_filter import mark_shopee_vector_posted
+    from src.shopee_supabase_db import mark_shopee_product_as_used
+except ImportError:
+    from shopee_ocr_vision_reader import analyze_product_image_with_vision
+    from shopee_Ai_persona_fb import generate_mama_fb_copy, assemble_fb_post_and_comment, post_to_facebook_page
+    from shopee_Ai_persona_instagram import (
+        generate_mama_instagram_copy, assemble_instagram_post, post_to_instagram_feed,
+        upload_temp_image_to_b2_signed as upload_ig_b2, delete_ephemeral_image_from_b2 as delete_ig_b2
+    )
+    from shopee_Ai_persona_threads import (
+        generate_mama_threads_copy, assemble_threads_post, post_to_threads_api, get_threads_config,
+        upload_temp_image_to_b2_signed as upload_th_b2, delete_ephemeral_image_from_b2 as delete_th_b2
+    )
+    from shopee_Ai_persona_bluesky import generate_mama_bluesky_copy, assemble_bluesky_post, post_to_bluesky
+    from src.shopee_telegram_audit import send_shopee_audit_report, has_successful_post
+    from src.shopee_redis_filter import mark_shopee_product_posted
+    from src.shopee_vector_filter import mark_shopee_vector_posted
+    from src.shopee_supabase_db import mark_shopee_product_as_used
+
+from bin.run_shopee_prepare_and_generate import run_preparation_and_generation
+
 TEMP_DIR = PROJECT_ROOT / "temp"
 PAYLOAD_FILE = TEMP_DIR / "shopee_payload.json"
+VISION_FILE = TEMP_DIR / "shopee_vision_ocr.json"
 
-# ANSI Colors untuk Visual Terminal di WSL Ubuntu
+# ANSI Colors untuk Paparan Terminal
 CYAN = "\033[96m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
@@ -47,18 +89,17 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 
-def print_banner(title: str, color: str = CYAN):
-    width = 75
-    print(f"\n{color}{BOLD}{'=' * width}")
-    print(f" {title.center(width - 2)} ")
-    print(f"{'=' * width}{RESET}")
+def print_step_header(step_num: int, step_title: str):
+    print("\n" + "═" * 78)
+    print(f"🔹 [STEP {step_num}] {step_title.upper()}")
+    print("═" * 78)
 
 
 def check_environment_variables() -> bool:
     """
     Step 0: Menyemak ketersediaan semua kunci persekitaran IRCM_* sebelum memulakan ujian.
     """
-    print_banner("STEP 0: PRE-FLIGHT ENVIRONMENT & SECRET CHECK", YELLOW)
+    print_step_header(0, "Semakan Kredensial & Sambungan API (.env.local)")
 
     required_services = {
         "OpenRouter AI Engine": [
@@ -131,133 +172,239 @@ def check_environment_variables() -> bool:
     return all_critical_ok
 
 
-def run_full_pipeline_test():
-    start_total_time = time.time()
-    print_banner("🧪 SHOPEE FEED AUTO-POSTER: END-TO-END MASTER TEST", BOLD + MAGENTA)
+def cleanup_temp_image(local_image_path: str = ""):
+    """Memadam fail imej fizikal sementara dari folder temp/."""
+    if local_image_path:
+        img_p = Path(local_image_path)
+        try:
+            if img_p.exists():
+                img_p.unlink()
+                print(f"   🧹 [CLEANUP] Fail imej '{img_p.name}' berjaya dipadam.")
+        except Exception as e:
+            print(f"   ⚠️ [CLEANUP WARN] Gagal memadam imej: {e}")
 
-    # 1. Semakan Kunci Persekitaran
+
+def run_all_step_diagnostic():
+    start_total_time = time.time()
+    print("=" * 78)
+    print("🧪 [DIAGNOSTIC TEST RUNNER] SHOPEE FEED AUTO-POSTER (WITH DRY-RUN OPTION)")
+    print("   Impian Rumahku & Cerita Mama Ecosystem")
+    print("=" * 78)
+
+    # =========================================================================
+    # STEP 0: SEMAKAN KUNCI PERSEKITARAN
+    # =========================================================================
     env_ready = check_environment_variables()
     if not env_ready:
         print(f"\n{RED}❌ [ABORT] Kunci pangkalan data atau AI teras tidak lengkap dalam .env.local!{RESET}")
         sys.exit(1)
 
-    step_results = {}
-
     # =========================================================================
-    # STEP 1: FETCH, FILTER & INITIALIZE PAYLOAD
+    # STEP 1: FETCH CALON SHOPEE DARI SUPABASE, REDIS & VECTOR FILTER
     # =========================================================================
-    try:
-        from bin.run_shopee_prepare_and_generate import run_preparation_and_generation
-        payload = run_preparation_and_generation()
-        if payload and PAYLOAD_FILE.exists():
-            step_results["Step 1 (Prepare & Filter)"] = "SUCCESS"
-        else:
-            raise RuntimeError("Gagal menghasilkan fail temp/shopee_payload.json")
-    except Exception as e:
-        print(f"\n{RED}❌ [STEP 1 FAILED]:{RESET} {e}")
-        step_results["Step 1 (Prepare & Filter)"] = f"FAILED: {str(e)}"
-        print_banner("UJIAN DIBATALKAN KERANA LANGKAH 1 GAGAL", RED)
+    print_step_header(1, "Pengambilan & Penapisan Calon Produk Shopee (Supabase / Redis / Vector)")
+    payload = run_preparation_and_generation()
+    if not payload or not PAYLOAD_FILE.exists():
+        print(f"{RED}❌ [ABORT] Gagal mendapatkan calon produk Shopee.{RESET}")
         return
 
-    # =========================================================================
-    # STEP 2: OCR VISION & MAMA ENGLISH REVIEW
-    # =========================================================================
-    try:
-        from bin.run_shopee_ocr_vison_reader import run_vision_step
-        run_vision_step()
-        step_results["Step 2 (Vision Reader)"] = "SUCCESS"
-    except Exception as e:
-        print(f"\n{RED}❌ [STEP 2 FAILED]:{RESET} {e}")
-        step_results["Step 2 (Vision Reader)"] = f"FAILED: {str(e)}"
-        print_banner("UJIAN DIBATALKAN KERANA LANGKAH 2 GAGAL", RED)
-        return
+    product_id = payload.get("shopee_product_id")
+    product_name = payload.get("shopee_product_name")
+    brand = payload.get("shopee_brand")
+    price = payload.get("shopee_price")
+    affiliate_link = payload.get("shopee_affiliate_link")
 
     # =========================================================================
-    # STEP 3A: FACEBOOK PAGE FEED & COMMENT
+    # STEP 2: MUAT TURUN IMEJ & ULASAN VISION (SIMPLE ENGLISH A2/B1)
     # =========================================================================
-    try:
-        from bin.run_shopee_post_fb import run_facebook_step
-        run_facebook_step()
-        with open(PAYLOAD_FILE, "r", encoding="utf-8") as f:
-            fb_res = json.load(f).get("post_results", {}).get("facebook", {})
-        step_results["Step 3A (Facebook Page)"] = "SUCCESS" if fb_res.get("status") == "success" else f"FAILED ({fb_res.get('error', 'Unknown')[:35]})"
-    except Exception as e:
-        print(f"\n{RED}❌ [STEP 3A FAILED]:{RESET} {e}")
-        step_results["Step 3A (Facebook Page)"] = f"FAILED: {str(e)}"
+    print_step_header(2, "Muat Turun Imej & Analisis OpenRouter Vision (Simple Plain English)")
+    vision_payload = analyze_product_image_with_vision(payload, max_attempts=3, delay_seconds=2)
+    mama_english_review = vision_payload.get("mama_english_review", "")
+    local_image_path = vision_payload.get("local_image_path", "")
+
+    print(f"\n🧠 Model Vision : {vision_payload.get('vision_model_used')}")
+    print(f"📝 Ulasan Visual (Simple English):\n\"{mama_english_review}\"")
+    print(f"📏 Panjang Aksara: {len(mama_english_review)} aksara (Sasaran: <= 500)")
 
     # =========================================================================
-    # STEP 3B: INSTAGRAM FEED VIA B2 BRIDGE
+    # STEP 3: OLAHAN TERJEMAHAN AYAT PERSONA MAMA (BM) MERENTASI 4 PLATFORM
     # =========================================================================
-    try:
-        from bin.run_shopee_post_instagram import run_instagram_step
-        run_instagram_step()
-        with open(PAYLOAD_FILE, "r", encoding="utf-8") as f:
-            ig_res = json.load(f).get("post_results", {}).get("instagram", {})
-        step_results["Step 3B (Instagram Feed)"] = "SUCCESS" if ig_res.get("status") == "success" else f"FAILED ({ig_res.get('error', 'Unknown')[:35]})"
-    except Exception as e:
-        print(f"\n{RED}❌ [STEP 3B FAILED]:{RESET} {e}")
-        step_results["Step 3B (Instagram Feed)"] = f"FAILED: {str(e)}"
+    print_step_header(3, "Olahan Copywriting Persona Mama (BM) Merentasi 4 Platform")
+
+    print("\n⏳ [3A] Menjana Ulasan Facebook Page (Story + 1st Comment)...")
+    fb_story = generate_mama_fb_copy(vision_payload)
+    fb_caption, fb_comment = assemble_fb_post_and_comment(vision_payload, fb_story)
+
+    print("\n⏳ [3B] Menjana Kapsyen Instagram Feed (Tepat 2 Ayat Gaya Hidup Kemas)...")
+    ig_story = generate_mama_instagram_copy(vision_payload)
+    ig_caption = assemble_instagram_post(vision_payload, ig_story)
+
+    print("\n⏳ [3C] Menjana Luahan Santai Threads (Had Keras <= 490 Aksara)...")
+    th_story = generate_mama_threads_copy(vision_payload)
+    th_caption = assemble_threads_post(vision_payload, th_story)
+
+    print("\n⏳ [3D] Menjana Mikro Ulasan Bluesky (Tepat 1 Ayat Padu <= 280 Aksara)...")
+    bs_story = generate_mama_bluesky_copy(vision_payload)
+    bs_full_text, bs_link, bs_bstart, bs_bend = assemble_bluesky_post(vision_payload, bs_story)
+
+    # Simpan hasil teks AI ke fail state
+    ai_captions = {
+        "facebook": fb_caption,
+        "facebook_comment": fb_comment,
+        "instagram": ig_caption,
+        "threads": th_caption,
+        "bluesky": bs_full_text,
+    }
+    payload["ai_captions"] = ai_captions
+    with open(PAYLOAD_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+
+    # Paparan Pratonton Lengkap Sebelum Memilih Mod
+    print("\n" + "=" * 78)
+    print("📋 [PRATONTON LENGKAP HASIL TERJEMAHAN PERSONA MAMA]")
+    print("=" * 78)
+    print(f"\n📘 {BOLD}1. FACEBOOK PAGE FEED ({len(fb_caption)} aksara):{RESET}\n{fb_caption}")
+    print(f"\n💬 {BOLD}FACEBOOK 1ST COMMENT:{RESET}\n{fb_comment}")
+    print("-" * 78)
+    print(f"\n📸 {BOLD}2. INSTAGRAM FEED ({len(ig_caption)} aksara):{RESET}\n{ig_caption}")
+    print("-" * 78)
+    print(f"\n🧵 {BOLD}3. META THREADS FEED ({len(th_caption)} aksara / 490):{RESET}\n{th_caption}")
+    print("-" * 78)
+    print(f"\n🦋 {BOLD}4. BLUESKY FEED ({len(bs_full_text)} aksara / 280):{RESET}\n{bs_full_text}")
+    print("=" * 78)
 
     # =========================================================================
-    # STEP 3C: META THREADS FEED VIA B2 BRIDGE
+    # STEP 4: PILIHAN INTERAKTIF (LIVE POST VS DRY RUN)
     # =========================================================================
-    try:
-        from bin.run_shopee_post_threads import run_threads_step
-        run_threads_step()
-        with open(PAYLOAD_FILE, "r", encoding="utf-8") as f:
-            th_res = json.load(f).get("post_results", {}).get("threads", {})
-        step_results["Step 3C (Meta Threads)"] = "SUCCESS" if th_res.get("status") == "success" else f"FAILED ({th_res.get('error', 'Unknown')[:35]})"
-    except Exception as e:
-        print(f"\n{RED}❌ [STEP 3C FAILED]:{RESET} {e}")
-        step_results["Step 3C (Meta Threads)"] = f"FAILED: {str(e)}"
+    print_step_header(4, "Pilihan Mod Pengedaran Media Sosial")
 
-    # =========================================================================
-    # STEP 3D: BLUESKY AT-PROTOCOL FEED
-    # =========================================================================
-    try:
-        from bin.run_shopee_post_blsky import run_bluesky_step
-        run_bluesky_step()
-        with open(PAYLOAD_FILE, "r", encoding="utf-8") as f:
-            bs_res = json.load(f).get("post_results", {}).get("bluesky", {})
-        step_results["Step 3D (Bluesky Feed)"] = "SUCCESS" if bs_res.get("status") == "success" else f"FAILED ({bs_res.get('error', 'Unknown')[:35]})"
-    except Exception as e:
-        print(f"\n{RED}❌ [STEP 3D FAILED]:{RESET} {e}")
-        step_results["Step 3D (Bluesky Feed)"] = f"FAILED: {str(e)}"
+    print("PILIHAN MOD PENGUJIAN PENGEDARAN:")
+    print("  [1] LIVE POST  - Hantar kandungan sebenar ke Facebook, Instagram, Threads, dan Bluesky.")
+    print("  [2] DRY RUN    - Simulasi sahaja (tidak pos ke akaun media sosial sebenar).")
 
-    # =========================================================================
-    # STEP 4 - 8: AUDIT TELEGRAM, GATEKEEPER & TRANSACTION COMMIT
-    # =========================================================================
     try:
-        from bin.run_shopee_audit_and_commit import run_audit_and_commit
-        run_audit_and_commit()
-        step_results["Step 4-8 (Audit & Commit)"] = "SUCCESS"
-    except SystemExit as se:
-        if se.code == 0:
-            step_results["Step 4-8 (Audit & Commit)"] = "SUCCESS"
+        choice = input("\nSila pilih mod [1 / 2] (Lalai: 2): ").strip()
+    except EOFError:
+        choice = "2"
+
+    post_results = {}
+
+    if choice == "1":
+        print("\n🚀 [LIVE POST AKTIF] Memulakan pemposan ke 4 platform media sosial...\n")
+
+        # 1. Facebook Page
+        fb_ok, fb_info, fb_msg = post_to_facebook_page(
+            image_path=local_image_path,
+            image_url=vision_payload.get("shopee_picture_url", ""),
+            post_caption=fb_caption,
+            comment_text=fb_comment
+        )
+        post_results["facebook"] = {"status": "success", **fb_info} if fb_ok else {"status": "failed", "error": fb_msg}
+
+        # 2. Instagram Feed (Signed B2 Image Bridge)
+        ig_b2_ok, ig_b2_url, ig_fid, ig_fname, ig_api, ig_tok, ig_b2_err = upload_ig_b2(local_image_path)
+        if ig_b2_ok:
+            try:
+                ig_ok, ig_info, ig_msg = post_to_instagram_feed(
+                    account_id=os.getenv("IRCM_INSTAGRAM_ACCOUNT_ID", "").strip(),
+                    access_token=os.getenv("IRCM_INSTAGRAM_ACCESS_TOKEN", "").strip(),
+                    image_url=ig_b2_url,
+                    caption=ig_caption
+                )
+                post_results["instagram"] = {"status": "success", **ig_info} if ig_ok else {"status": "failed", "error": ig_msg}
+            finally:
+                delete_ig_b2(ig_api, ig_tok, ig_fid, ig_fname)
         else:
-            step_results["Step 4-8 (Audit & Commit)"] = f"BLOCKED (Exit Code: {se.code})"
-    except Exception as e:
-        print(f"\n{RED}❌ [STEP 4-8 FAILED]:{RESET} {e}")
-        step_results["Step 4-8 (Audit & Commit)"] = f"FAILED: {str(e)}"
+            post_results["instagram"] = {"status": "failed", "error": ig_b2_err}
+
+        # 3. Meta Threads (Signed B2 Image Bridge)
+        th_uid, th_token, th_err = get_threads_config()
+        if not th_err:
+            th_b2_ok, th_b2_url, th_fid, th_fname, th_api, th_tok, th_b2_err = upload_th_b2(local_image_path)
+            if th_b2_ok:
+                try:
+                    th_ok, th_info, th_msg = post_to_threads_api(
+                        user_id=th_uid,
+                        access_token=th_token,
+                        image_url=th_b2_url,
+                        caption=th_caption
+                    )
+                    post_results["threads"] = {"status": "success", **th_info} if th_ok else {"status": "failed", "error": th_msg}
+                finally:
+                    delete_th_b2(th_api, th_tok, th_fid, th_fname)
+            else:
+                post_results["threads"] = {"status": "failed", "error": th_b2_err}
+        else:
+            post_results["threads"] = {"status": "failed", "error": th_err}
+
+        # 4. Bluesky AT-Protocol
+        bs_ok, bs_info, bs_msg = post_to_bluesky(
+            full_text=bs_full_text,
+            affiliate_link=bs_link,
+            byte_start=bs_bstart,
+            byte_end=bs_bend,
+            image_path=local_image_path
+        )
+        post_results["bluesky"] = {"status": "success", **bs_info} if bs_ok else {"status": "failed", "error": bs_msg}
+
+    else:
+        print("\n🛡️ [DRY RUN SIMULATION] Menggunakan data simulasi berjaya (Akaun asal tidak disentuh).")
+        post_results = {
+            "facebook": {"status": "success", "post_id": f"sim_fb_{product_id}", "type": "dry_run"},
+            "instagram": {"status": "success", "media_id": f"sim_ig_{product_id}", "type": "dry_run"},
+            "threads": {"status": "success", "thread_id": f"sim_th_{product_id}", "type": "dry_run"},
+            "bluesky": {"status": "success", "uri": f"at://did:plc:sim/app.bsky.feed.post/{product_id}", "type": "dry_run"},
+        }
+
+    # Kemas kini post_results ke fail state payload
+    payload["post_results"] = post_results
+    with open(PAYLOAD_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
 
     # =========================================================================
-    # RINGKASAN AKHIR KEPUTUSAN UJIAN (TEST SUMMARY)
+    # STEP 5: LAPORAN RINGKASAN AUDIT TELEGRAM
+    # =========================================================================
+    print_step_header(5, "Penghantaran Kad Ringkasan & Audit Telegram")
+    audit_ok, audit_msg = send_shopee_audit_report(payload)
+    print(f"📊 Status Telegram Audit: {'✅ Berjaya Dihantar' if audit_ok else '⚠️ ' + audit_msg}")
+
+    # =========================================================================
+    # STEP 6: TRANSAKSI PANGKALAN DATA & PEMBERSIHAN FAIL
+    # =========================================================================
+    print_step_header(6, "Penguncian Pangkalan Data & Pembersihan Fail Sementara")
+
+    if choice == "1" and has_successful_post(payload):
+        # 1. Kunci Redis (30 Hari)
+        mark_shopee_product_posted(product_id)
+        print(f"✅ Redis: Kunci 'shopee:product:{product_id}' dikunci selama 30 hari.")
+
+        # 2. Kunci Vector DB (2 Hari Window)
+        mark_shopee_vector_posted(product_id, product_name)
+        print(f"✅ Vector DB: Keserupaan semantik 'sp_{product_id}' dikunci.")
+
+        # 3. Kemas kini Supabase (shopee_status_used = true)
+        sb_ok, sb_msg = mark_shopee_product_as_used(product_id)
+        print(f"✅ Supabase: {sb_msg}")
+    else:
+        print("⚪ [DRY RUN / SKIPPED] Status pangkalan data (Redis, Vector, Supabase) TIDAK dikunci.")
+        print("ℹ️  Produk ini kekal berstatus 'unused' dan sedia digunakan pada masa hadapan.")
+
+    # Pembersihan fail imej tempatan
+    cleanup_temp_image(local_image_path)
+
+    # =========================================================================
+    # RINGKASAN AKHIR KEPUTUSAN
     # =========================================================================
     elapsed = time.time() - start_total_time
-    print_banner("📊 LAPORAN KEPUTUSAN UJIAN KESELURUHAN PIPELINE", BOLD + GREEN)
-    print(f"⏱️ Masa Larian Keseluruhan: {elapsed:.2f} saat\n")
-
-    for step_name, status in step_results.items():
-        if "SUCCESS" in status:
-            status_badge = f"{GREEN}✔ {status}{RESET}"
-        elif "BLOCKED" in status:
-            status_badge = f"{YELLOW}⚠ {status}{RESET}"
-        else:
-            status_badge = f"{RED}✖ {status}{RESET}"
-        print(f"  • {BOLD}{step_name:<35}{RESET} : {status_badge}")
-
-    print(f"\n{BOLD}{'=' * 75}{RESET}\n")
+    print("\n" + "═" * 78)
+    print(f"{BOLD}{GREEN}📊 LAPORAN KEPUTUSAN UJIAN SELESAI ({elapsed:.2f}s){RESET}")
+    print("═" * 78)
+    for platform, res in post_results.items():
+        st = res.get("status", "unknown")
+        badge = f"{GREEN}✔ SUCCESS{RESET}" if st == "success" else f"{RED}✖ FAILED ({res.get('error', '')[:30]}){RESET}"
+        print(f"  • {BOLD}{platform.capitalize():<15}{RESET} : {badge}")
+    print("═" * 78 + "\n")
 
 
 if __name__ == "__main__":
-    run_full_pipeline_test()
+    run_all_step_diagnostic()

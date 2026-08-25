@@ -5,6 +5,7 @@ Impian Rumahku Ecosystem (Step 3 & 4 Threads Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
 - Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural lifestyle tone
+- Short Friendly Moniker: Relatable, friendly daily storytelling
 - Title Cleaner: Removes raw emojis, CJK symbols, and brackets automatically
 - Raw Payload: No max_tokens restriction, fixed temperature=0.40 for stable completion
 - Hard safety cap: <= 490 characters total (Threads 500 character limit)
@@ -390,9 +391,9 @@ def clean_ai_output(text: str) -> str:
 
 
 def validate_threads_text(text: str) -> Tuple[bool, str]:
-    """Menyemak kualiti teks ulasan Threads (70 hingga 220 aksara)."""
-    if not text or len(text) < 70:
-        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 70)."
+    """Menyemak kualiti teks ulasan Threads (60 hingga 220 aksara)."""
+    if not text or len(text) < 60:
+        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 60)."
     if len(text) > 230:
         return False, f"Teks terlalu panjang ({len(text)} aksara, maksima 230)."
 
@@ -406,12 +407,13 @@ def validate_threads_text(text: str) -> Tuple[bool, str]:
 def generate_fallback_threads_story(product_name: str) -> str:
     """Teks sandaran asas khas Threads jika AI gagal."""
     clean_name = clean_shopee_title(product_name, max_len=30)
-    return f"Mama suka betul guna {clean_name} ni. Sangat praktikal, ringan dan memudahkan kerja harian untuk kemaskan rumah kita."
+    short_name = clean_name.split("|")[0].split("-")[0].strip()[:28]
+    return f"Senang kerja bila ada {short_name} ni kat rumah. Ringan, praktikal dan sangat membantu bila nak kemaskan ruang harian."
 
 
 def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
     """
-    Menjana ulasan santai Bahasa Melayu bagi Threads dengan kefahaman masa MYT.
+    Menjana luahan santai harian Threads Mama dengan had ringkas dan bersahaja.
     """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title(raw_name, max_len=30)
@@ -431,18 +433,19 @@ def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
 
     system_prompt = (
         "Anda adalah 'Mama' daripada 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra, "
-        "santai, dan suka bercerita di Threads.\n\n"
+        "santai, dan suka berkongsi luahan harian yang 'relatable' di Threads.\n\n"
         "Tugasan Utama:\n"
-        "1. Teliti nama produk dan ulasan visual Bahasa Inggeris yang diberikan.\n"
-        "2. Olah nama produk menjadi lebih ringkas, menarik, dan selesa disebut dalam ulasan.\n"
-        "3. Tulis 1 atau 2 ayat ulasan santai bersahaja dalam Bahasa Melayu Malaysia tulen (sekitar 20 hingga 35 patah perkataan sahaja).\n"
-        "4. Selitkan sentuhan praktikal rumah yang selesa dan kemas.\n\n"
+        "1. Fahami fungsi utama produk daripada tajuk dan rujukan visual English yang diberikan.\n"
+        "2. Ringkaskan tajuk panjang Shopee menjadi nama panggilan harian yang ringkas (contoh: 'tisu basah ni', 'rak rempah ni', 'tumbler ni', 'alas kaki serap air ni').\n"
+        "3. Tulis 1 atau 2 ayat luahan santai bersahaja dalam Bahasa Melayu Malaysia tulen (sekitar 20 hingga 35 patah perkataan sahaja).\n"
+        "4. Tulis seperti bercerita santai dengan rakan media sosial tentang betapa senangnya bila ada barang ini untuk urusan rumah.\n\n"
         "Pantangan Ketat:\n"
         "- DILARANG sebut harga atau perkataan 'RM' (harga dipasang oleh kod).\n"
-        "- DILARANG letak pautan/URL Shopee di dalam ayat.\n"
-        "- DILARANG guna emoji sama sekali (emoji diuruskan oleh kod).\n"
-        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, yuk, bikin, gampang).\n"
-        "- Pastikan ayat diakhiri dengan tanda noktah yang lengkap.\n"
+        "- DILARANG letak pautan/URL Shopee di dalam ayat ulasan.\n"
+        "- DILARANG guna emoji sama sekali (kod python akan pasang emoji).\n"
+        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, ngak, yuk, bikin, gampang, cobain).\n"
+        "- Gunakan frasa Melayu santai harian (contoh: senang betul kerja, jimat masa, tak pening kepala, kemas elok).\n"
+        "- Pastikan ayat lengkap dan diakhiri dengan tanda noktah (.).\n"
         "- Terus berikan ayat ulasan tanpa sebarang mukadimah atau tag pemikiran."
     )
 
@@ -450,8 +453,8 @@ def generate_mama_threads_copy(payload: Dict[str, Any]) -> str:
         f"Konteks Waktu Siaran: {time_context}\n"
         f"Nama Asal Produk: {clean_name}\n"
         f"Jenama: {brand}\n"
-        f"Rujukan Visual: {short_vision}\n\n"
-        f"Sila olah ulasan santai Mama untuk Threads:"
+        f"Rujukan Visual (English Mudah): {short_vision}\n\n"
+        f"Sila olah luahan santai Threads Mama (ringkaskan tajuk jadi nama panggilan dalam ayat):"
     )
 
     for model_name in models:
