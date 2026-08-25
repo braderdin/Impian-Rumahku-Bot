@@ -1,0 +1,63 @@
+name: Test Local Qwen 2.5 3B Translation Engine
+
+on:
+  workflow_dispatch: # Manual trigger sahaja tanpa schedule
+
+jobs:
+  test-qwen-local:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Kod Repositori
+        uses: actions/checkout@v4
+
+      - name: Pasang Persekitaran Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Cache model GGUF dari Hugging Face (~2.1 GB) agar tidak dimuat turun berulang kali
+      - name: Pulihkan / Simpan Cache Hugging Face GGUF
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: ${{ runner.os }}-hf-qwen-3b-gguf-v1
+          restore-keys: |
+            ${{ runner.os }}-hf-qwen-3b-gguf-
+
+      # Cache wheel & package pip
+      - name: Pulihkan / Simpan Cache Pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-qwen-test-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-qwen-test-
+
+      - name: Pasang Pustaka Asas & llama-cpp-python (Prebuilt CPU Wheel)
+        run: |
+          python -m pip install --upgrade pip
+          # Pasang dependensi projek sedia ada
+          pip install -r requirements.txt || true
+          pip install huggingface-hub python-dotenv requests pillow
+          
+          # Pasang binary siap bina llama-cpp-python CPU (< 10 saat tanpa perlu compile)
+          pip install llama-cpp-python \
+            --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+
+      - name: Jalankan Ujian Saluran Local Qwen 2.5 3B
+        env:
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_VISION: ${{ secrets.IRCM_MODEL_VISION }}
+          IRCM_SUPABASE_URL: ${{ secrets.IRCM_SUPABASE_URL }}
+          IRCM_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.IRCM_SUPABASE_SERVICE_ROLE_KEY }}
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_UPSTASH_VECTOR_REST_URL: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_URL }}
+          IRCM_UPSTASH_VECTOR_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_TOKEN }}
+          IRCM_TELEGRAM_BOT_TOKEN: ${{ secrets.IRCM_TELEGRAM_BOT_TOKEN }}
+          IRCM_TELEGRAM_CHAT_ID: ${{ secrets.IRCM_TELEGRAM_CHAT_ID }}
+        run: |
+          python experiments/local_llm/test_pipeline_local_qwen.py
