@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Local Vision-Language (VLM) Engine: Qwen2.5-VL 3B GGUF (Q5_K_M Edition)
+Local Vision-Language (VLM) Engine: Qwen2.5-VL 3B GGUF (Q5_K_M Edition with Resilient Fallback)
 Location: experiments/local_llm/qwen_vl_local_engine.py
 
 Features:
-- Loads unsloth/Qwen2.5-VL-3B-Instruct-GGUF (Qwen2.5-VL-3B-Instruct-Q5_K_M.gguf ~2.22 GB)
-- Loads Multimodal Projector (mmproj-F16.gguf ~1.34 GB)
-- Direct Image-to-BM Persona Mama generation (No OpenRouter Vision needed)
-- Memory-safe image pre-scaling (512x512) for rapid CPU inference
-- Zero Indonesian slangs scrubber & sentence boundary protector
+- Expanded Context Window (n_ctx=4096) for large vision embeddings + text generation
+- 3-Tier Multi-Attempt Execution:
+  * Tier 1: Full VLM (Image + Text Prompt)
+  * Tier 2: Retry with Optimized Sampling (Higher Temp / Pure ChatML)
+  * Tier 3: Local Text-Only Instruct (Bypass vision if image fails)
+  * Tier 4: Dynamic Persona Mama Rule-Based Generator (100% Zero-Fail Guarantee)
+- Strict Glitch & Foreign Alphabet Detector (Ensures only clean A-Z, 0-9, and standard punctuation)
+- Automatic Indonesian-to-Malay Vocabulary Scrubber
 """
 
 import os
@@ -18,7 +21,7 @@ import time
 import base64
 from io import BytesIO
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 from PIL import Image
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
@@ -39,26 +42,23 @@ def get_model_and_mmproj_paths() -> Tuple[str, str]:
     """Memuat turun fail GGUF Q5_K_M dan mmproj dari Hugging Face cache."""
     print(f"📥 [VLM ENGINE] Memeriksa fail model: {MODEL_FILENAME}...")
     start_t = time.time()
-    
     model_path = hf_hub_download(
         repo_id=REPO_ID,
         filename=MODEL_FILENAME,
         local_files_only=False
     )
-    
     print(f"📥 [VLM ENGINE] Memeriksa fail projektor visual: {MMPROJ_FILENAME}...")
     mmproj_path = hf_hub_download(
         repo_id=REPO_ID,
         filename=MMPROJ_FILENAME,
         local_files_only=False
     )
-    
     print(f"✅ [VLM ENGINE] Fail model & vision sedia dalam cache ({time.time() - start_t:.2f}s)!")
     return model_path, mmproj_path
 
 
 def load_local_qwen_vlm() -> Llama:
-    """Menginisialisasi enjin Llama multimodal untuk CPU 2-Core."""
+    """Menginisialisasi enjin Llama multimodal dengan ruang konteks 4096."""
     global _VLM_INSTANCE
     if _VLM_INSTANCE is not None:
         return _VLM_INSTANCE
@@ -67,7 +67,6 @@ def load_local_qwen_vlm() -> Llama:
     print("⚙️ [VLM ENGINE] Memuatkan Qwen2.5-VL (Q5_K_M) + mmproj ke dalam memori CPU...")
     start_t = time.time()
 
-    # Inisialisasi Vision Chat Handler
     chat_handler = None
     try:
         from llama_cpp.llama_chat_format import Qwen2VLChatHandler
@@ -77,14 +76,15 @@ def load_local_qwen_vlm() -> Llama:
             from llama_cpp.llama_chat_format import Llava15ChatHandler
             chat_handler = Llava15ChatHandler(clip_model_path=mmproj_path)
         except Exception as e:
-            print(f"⚠️ [VLM WARN] Gagal inisialisasi chat handler spesifik: {e}")
+            print(f"⚠️ [VLM WARN] Gagal inisialisasi chat handler: {e}")
 
+    # n_ctx=4096 memberi ruang besar untuk imej + token perbualan
     _VLM_INSTANCE = Llama(
         model_path=model_path,
         chat_handler=chat_handler,
-        n_ctx=2048,
+        n_ctx=4096,
         n_threads=2,
-        n_batch=256,
+        n_batch=512,
         verbose=False
     )
 
@@ -92,15 +92,15 @@ def load_local_qwen_vlm() -> Llama:
     return _VLM_INSTANCE
 
 
-def prepare_image_base64(image_path: str, max_size: int = 512) -> Optional[str]:
-    """Mengecilkan resolusi imej ke 512px agar inferens CPU laju dan jimat RAM."""
+def prepare_image_base64(image_path: str, max_size: int = 448) -> Optional[str]:
+    """Mengecilkan resolusi imej ke 448px untuk penjimatan token visual maksimum."""
     try:
         with Image.open(image_path) as img:
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
             img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
             buffer = BytesIO()
-            img.save(buffer, format="JPEG", quality=80, optimize=True)
+            img.save(buffer, format="JPEG", quality=75, optimize=True)
             b64_data = base64.b64encode(buffer.getvalue()).decode("utf-8")
             return f"data:image/jpeg;base64,{b64_data}"
     except Exception as e:
@@ -109,7 +109,7 @@ def prepare_image_base64(image_path: str, max_size: int = 512) -> Optional[str]:
 
 
 def clean_and_scrub_bm_copy(text: str) -> str:
-    """Membersihkan tag pemikiran, istilah Indonesia, dan tanda baca rosak."""
+    """Membersihkan tag pemikiran, istilah Indonesia, dan menormalkan tanda baca."""
     if not text:
         return ""
 
@@ -132,6 +132,8 @@ def clean_and_scrub_bm_copy(text: str) -> str:
         r"\bcobain\b": "cuba",
         r"\bspoons\b": "sudu",
         r"\bspoon\b": "sudu",
+        r"\bknife\b": "pisau",
+        r"\bknives\b": "set pisau",
     }
     for pattern, replacement in indo_to_bm.items():
         cleaned = re.sub(pattern, replacement, cleaned, flags=re.IGNORECASE)
@@ -157,6 +159,46 @@ def clean_and_scrub_bm_copy(text: str) -> str:
     return cleaned
 
 
+def validate_text_quality(text: str) -> Tuple[bool, str]:
+    """
+    Menyemak sama ada teks mempunyai panjang mencukupi dan bebas daripada aksara asing/glitch.
+    """
+    if not text or len(text) < 120:
+        return False, f"Teks terlalu pendek ({len(text)} aksara, minima 120)."
+
+    # Hanya benarkan abjad Latin, nombor, dan tanda baca lazim
+    allowed_pattern = re.compile(r"^[a-zA-Z0-9\s.,!?'\"\–\—\-\(\)/%:;RMrm\n\r]+$")
+    if not allowed_pattern.match(text):
+        return False, "Dikesan simbol/aksara asing (bukan abjad Latin standard)."
+
+    # Semak perkataan berulang (looping glitch)
+    words = re.findall(r"\b\w+\b", text.lower())
+    if words:
+        counts: Dict[str, int] = {}
+        for w in words:
+            if len(w) > 3:
+                counts[w] = counts.get(w, 0) + 1
+                if counts[w] > 8:
+                    return False, f"Glitch dikesan: Perkataan '{w}' berulang melebihi 8 kali."
+
+    return True, ""
+
+
+def generate_fallback_persona_mama(product_name: str, brand: str, price: float) -> str:
+    """
+    Penjana teks Persona Mama berasaskan peraturan dinamik jika semua percubaan AI gagal.
+    """
+    clean_name = re.sub(r"[【】\[\]()_~*#|/\\-]+", " ", product_name)
+    words = [w for w in clean_name.split() if len(w) > 2][:4]
+    short_title = " ".join(words) if words else "Barangan Rumah"
+
+    return (
+        f"Memang seronok dan memudahkan kerja harian bila ada {short_title} ni dekat rumah. "
+        f"Barang daripada {brand} ni direka kemas, tahan lasak, dan sangat praktikal untuk kegunaan seisi keluarga setiap hari. "
+        f"Bukan sahaja menjimatkan masa mengemas, malah ruang rumah pun nampak tersusun rapi dan sedap mata memandang tanpa pening kepala."
+    ).strip()
+
+
 def generate_local_qwen_vl_copy(
     product_name: str,
     brand: str,
@@ -164,58 +206,109 @@ def generate_local_qwen_vl_copy(
     local_image_path: str
 ) -> Tuple[str, float, int]:
     """
-    Menjana ulasan promosi Persona Mama BM terus daripada gambar & data produk.
-    Mengembalikan: (hasil_bm, masa_inferens_saat, bilangan_aksara)
+    Menjana ulasan promosi Persona Mama BM dengan sistem perlindungan kegagalan 3-Peringkat.
     """
     vlm = load_local_qwen_vlm()
     base64_img = prepare_image_base64(local_image_path)
+    start_time = time.time()
+
+    clean_title = re.sub(r"[【】\[\]()_~*#|/\\-]+", " ", product_name).strip()[:50]
 
     system_prompt = (
-        "Anda ialah 'Mama' daripada komuniti 'Impian Rumahku & Cerita Mama' — seorang suri rumah di Malaysia yang mesra, "
-        "praktikal, dan suka berkongsi barang rumah berguna dalam Bahasa Melayu harian yang santai dan natural.\n\n"
+        "Anda ialah 'Mama' daripada komuniti 'Impian Rumahku & Cerita Mama' — seorang suri rumah Malaysia yang ceria, "
+        "praktikal, dan berkongsi pengalaman menggunakan barang rumah berguna dalam Bahasa Melayu harian yang santai.\n\n"
         "TUGASAN:\n"
-        "1. Teliti gambar produk fizikal, tajuk produk, dan harga yang diberikan.\n"
-        "2. Tulis 1 atau 2 perenggan ulasan santai gaya Mama dalam Bahasa Melayu Malaysia tulen (sekitar 50 hingga 75 patah perkataan sahaja).\n"
-        "3. Huraikan warna, bentuk, bahan, atau kegunaan praktikal yang kelihatan pada gambar serta bagaimana ia memudahkan urusan rumah.\n"
-        "4. SASARAN PANJANG: Tepat antara 350 hingga 550 aksara.\n\n"
-        "PANTANG LARANG KETAT:\n"
+        "1. Teliti gambar dan tajuk produk yang diberikan.\n"
+        "2. Tulis 1 atau 2 perenggan ulasan santai gaya Mama dalam Bahasa Melayu Malaysia (sekitar 50 hingga 75 patah perkataan).\n"
+        "3. Sebutkan warna, bahan, atau fungsi praktikal yang memudahkan kerja rumah atau memasak.\n"
+        "4. SASARAN PANJANG: Antara 350 hingga 550 aksara.\n\n"
+        "PANTANG LARANG:\n"
         "- DILARANG guna istilah Indonesia (jangan guna: abu-abu, kamar mandi, uang, anda, banget, bisa, bikin, gampang, cobain).\n"
-        "- Gunakan istilah harian Melayu (kelabu, bilik air, senang lap, jimat ruang, kemas elok, korang).\n"
-        "- DILARANG sebut harga atau perkataan 'RM' dalam perenggan cerita.\n"
-        "- DILARANG meletakkan link, hashtag, atau emoji (kod sistem akan pasang secara automatik).\n"
-        "- Terus berikan teks ulasan tanpa sebarang mukadimah atau tajuk header."
+        "- Gunakan istilah harian Melayu (kelabu, bilik air, senang potong, jimat ruang, kemas elok, korang).\n"
+        "- DILARANG sebut harga atau perkataan 'RM'.\n"
+        "- DILARANG letak link, hashtag, atau emoji.\n"
+        "- Terus berikan teks ulasan tanpa sebarang mukadimah."
     )
 
     user_text = (
-        f"Nama Produk: {product_name[:60]}\n"
+        f"Produk: {clean_title}\n"
         f"Jenama: {brand}\n"
-        f"Harga: RM{price:.2f}\n\n"
-        f"Sila teliti gambar produk dan tulis ulasan santai Persona Mama BM (350-550 aksara):"
+        f"Tolong olah ulasan santai Persona Mama BM (350-550 aksara):"
     )
 
-    content_list = [{"type": "text", "text": user_text}]
+    # =========================================================================
+    # PERCUBAAN 1 & 2: VLM MODALITI PENUH (GAMBAR + TEKS)
+    # =========================================================================
     if base64_img:
-        content_list.append({"type": "image_url", "image_url": {"url": base64_img}})
+        messages_vlm = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_text},
+                    {"type": "image_url", "image_url": {"url": base64_img}},
+                ],
+            },
+        ]
 
-    messages = [
+        for attempt in range(1, 3):
+            print(f"🧠 [VLM ATTEMPT {attempt}/2] Memproses imej dan menjana ulasan BM...")
+            try:
+                response = vlm.create_chat_completion(
+                    messages=messages_vlm,
+                    temperature=0.45 if attempt == 1 else 0.65,
+                    top_p=0.90,
+                    max_tokens=260,
+                    repeat_penalty=1.18,
+                )
+                raw_content = response["choices"][0]["message"]["content"]
+                clean_bm = clean_and_scrub_bm_copy(raw_content)
+                is_valid, reason = validate_text_quality(clean_bm)
+
+                if is_valid:
+                    elapsed = time.time() - start_time
+                    print(f"   ✅ [VLM Berjaya] Teks diterima ({len(clean_bm)} aksara).")
+                    return clean_bm, elapsed, len(clean_bm)
+                else:
+                    print(f"   ⚠️ [VLM Tidak Sah ({attempt}/2)]: {reason}")
+            except Exception as e:
+                print(f"   ⚠️ [Ralat VLM Execution]: {e}")
+
+            time.sleep(1)
+
+    # =========================================================================
+    # PERCUBAAN 3: LOCAL TEXT-ONLY INSTRUCT FALLBACK
+    # (Gunakan enjin Qwen yang sama tanpa lapisan imej jika projektor visual gagal)
+    # =========================================================================
+    print("🔄 [FALLBACK TIER 2] Mencuba mod teks tempatan tanpa projektor imej...")
+    messages_text = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": content_list},
+        {"role": "user", "content": user_text},
     ]
 
-    print("🧠 [QWEN-VL INFERENCE] Memproses imej dan menjana ulasan BM...")
-    start_inference = time.time()
+    try:
+        response_text = vlm.create_chat_completion(
+            messages=messages_text,
+            temperature=0.40,
+            top_p=0.85,
+            max_tokens=220,
+            repeat_penalty=1.20,
+        )
+        raw_text_only = response_text["choices"][0]["message"]["content"]
+        clean_text_only = clean_and_scrub_bm_copy(raw_text_only)
+        is_valid, reason = validate_text_quality(clean_text_only)
 
-    # Had max_tokens=180 memberi ruang mencukupi (~450-550 aksara) tanpa terpotong
-    response = vlm.create_chat_completion(
-        messages=messages,
-        temperature=0.38,
-        top_p=0.85,
-        max_tokens=180,
-        repeat_penalty=1.20
-    )
+        if is_valid:
+            elapsed = time.time() - start_time
+            print(f"   ✅ [Text-Only Berjaya] Teks diterima ({len(clean_text_only)} aksara).")
+            return clean_text_only, elapsed, len(clean_text_only)
+    except Exception as e:
+        print(f"   ⚠️ [Ralat Text-Only Fallback]: {e}")
 
-    inference_time = time.time() - start_inference
-    raw_content = response["choices"][0]["message"]["content"]
-    final_bm = clean_and_scrub_bm_copy(raw_content)
-
-    return final_bm, inference_time, len(final_bm)
+    # =========================================================================
+    # PERCUBAAN 4: DYNAMIC RULE-BASED PERSONA MAMA
+    # =========================================================================
+    print("🛡️ [FALLBACK TIER 3] Menggunakan penjana ulasan Persona Mama terjamin.")
+    guaranteed_copy = generate_fallback_persona_mama(product_name, brand, price)
+    elapsed = time.time() - start_time
+    return guaranteed_copy, elapsed, len(guaranteed_copy)
