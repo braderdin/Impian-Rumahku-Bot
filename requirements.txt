@@ -40,3 +40,8 @@ torch
 malaya
 sentencepiece
 protobuf
+
+# Local LLM GGUF Engine (Qwen 2.5 3B GGUF)
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+huggingface-hub>=0.28.0
+llama-cpp-python>=0.3.0
