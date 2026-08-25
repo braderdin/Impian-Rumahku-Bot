@@ -4,7 +4,8 @@ Shopee Auto-Poster Pipeline: Step 3A Runner (Facebook Page Feed & Comment)
 Location: bin/run_shopee_post_fb.py
 Features:
 - Imports core functions directly from src/shopee_Ai_persona_fb.py
-- Smart Sentence-Boundary Trimmer (guarantees overall caption strictly 500 - 750 chars)
+- Smart Sentence-Boundary Trimmer (guarantees overall caption strictly 450 - 750 chars)
+- Direct Story Start (No header title above the post)
 - Posts physical image to FB Page Feed
 - Dispatches code-locked Shopee affiliate link to the first comment
 - Updates temp/shopee_payload.json with status & generated caption
@@ -35,27 +36,22 @@ MAX_FB_HARD_CAP = 750
 def enforce_fb_character_limit(post_caption: str, comment_text: str, payload: dict) -> str:
     """
     Memastikan teks hantaran FB tidak melebihi had 750 aksara dengan
-    memotong teks pada noktah ayat terakhir yang lengkap.
+    memotong teks pada noktah ayat terakhir yang lengkap (tanpa tajuk header).
     """
     if len(post_caption) <= MAX_FB_HARD_CAP:
         return post_caption
 
-    # Asingkan bahagian header, body, dan footer
-    title_raw = str(payload.get("shopee_product_name", "")).strip()
     price = float(payload.get("shopee_price", 0.0))
-
-    header = f"✨ {title_raw[:45]}...\n\n" if len(title_raw) > 45 else f"✨ {title_raw}\n\n"
     footer = (
         f"\n\n💰 Harga Mesra Poket: RM{price:.2f}\n"
         f"📌 Mama dah letak link barang ni di ruangan komen pertama di bawah ya! 👇\n\n"
         f"#ImpianRumahku #CeritaMama #KemasRumah #TipsSuriRumah #RacunShopee"
     )
 
-    fixed_len = len(header) + len(footer)
+    fixed_len = len(footer)
     max_story_space = MAX_FB_HARD_CAP - fixed_len
 
-    # Dapatkan teks asal ulasan AI
-    story_raw = post_caption.replace(header, "").replace(footer, "").strip()
+    story_raw = post_caption.replace(footer, "").strip()
 
     if len(story_raw) > max_story_space:
         trimmed = story_raw[:max_story_space]
@@ -65,7 +61,7 @@ def enforce_fb_character_limit(post_caption: str, comment_text: str, payload: di
         else:
             story_raw = trimmed.rstrip() + "..."
 
-    return f"{header}{story_raw}{footer}".strip()
+    return f"{story_raw}{footer}".strip()
 
 
 def run_facebook_step():
@@ -83,10 +79,10 @@ def run_facebook_step():
     # 1. Jana Ulasan Santai Mama FB (BM) menggunakan enjin src/
     mama_story_bm = generate_mama_fb_copy(payload)
 
-    # 2. Cantumkan Kapsyen FB & Komen Affiliate
+    # 2. Cantumkan Kapsyen FB & Komen Affiliate (Direct Story Hook)
     post_caption_raw, comment_text = assemble_fb_post_and_comment(payload, mama_story_bm)
 
-    # 3. Kawalan Had Aksara (Enforce 500 - 750 Aksara)
+    # 3. Kawalan Had Aksara (Enforce 450 - 750 Aksara)
     post_caption = enforce_fb_character_limit(post_caption_raw, comment_text, payload)
 
     print("\n" + "-" * 75)

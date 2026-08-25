@@ -179,6 +179,7 @@ def get_openrouter_config() -> Tuple[Optional[str], Optional[str], List[str], st
         os.getenv("IRCM_MODEL_PRIMARY", "").strip(),
         os.getenv("IRCM_MODEL_FALLBACK_1", "").strip(),
         os.getenv("IRCM_MODEL_FALLBACK_2", "").strip(),
+        os.getenv("IRCM_MODEL_FALLBACK_3", "").strip(),
     ]
     valid_models = [m for m in models if m]
 

@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Shopee AI Persona Facebook Generator & Auto-Poster (MYT-Time Aware & Emoji-Scrubbed)
+Shopee AI Persona Facebook Generator & Auto-Poster (No-Header Direct Hook Edition)
 Impian Rumahku Ecosystem (Step 3 & 4 Facebook Pipeline)
 Features:
 - Reads temp/shopee_vision_ocr.json
 - Time-Aware Context: Injects Malaysian Time (MYT / UTC+8) for natural storytelling
-- Short Friendly Moniker: Extracts clean everyday product name and weaves function naturally
-- Title Cleaner: Removes raw emojis and foreign CJK characters automatically
+- Direct Hook: Starts directly with situational story (No top title header)
 - Raw Payload: No max_tokens restriction for fluid, unclipped completions
-- Post Length: Target 500 - 750 characters total post caption
+- Post Length: Target 450 - 700 characters total post caption
 - AI Model Cascading: Primary (2x) -> Fallback 1 (2x) -> Fallback 2 (2x) -> Rule-based fallback
 - Facebook Strategy: Posts photo + caption to FB Page, posts locked affiliate link in 1st comment
 """
@@ -107,6 +106,7 @@ def get_openrouter_config() -> Tuple[Optional[str], Optional[str], List[str], st
         os.getenv("IRCM_MODEL_PRIMARY", "").strip(),
         os.getenv("IRCM_MODEL_FALLBACK_1", "").strip(),
         os.getenv("IRCM_MODEL_FALLBACK_2", "").strip(),
+        os.getenv("IRCM_MODEL_FALLBACK_3", "").strip(),
     ]
     valid_models = [m for m in models if m]
 
@@ -124,14 +124,11 @@ def clean_shopee_title_for_prompt(title: str) -> str:
     if not title:
         return "Barangan Rumah Praktikal"
 
-    # 1. Buang emoji mentah
     emoji_pattern = re.compile(
         "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
         flags=re.UNICODE,
     )
     cleaned = emoji_pattern.sub("", title)
-
-    # 2. Buang aksara CJK (Cina, Jepun, Korea) & simbol kurungan
     cleaned = re.sub(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", "", cleaned)
     cleaned = re.sub(r"[【】\[\]()_~*#|/\\-]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
@@ -153,7 +150,7 @@ def trim_to_last_sentence(text: str) -> str:
 
 def clean_ai_output(text: str) -> str:
     """
-    Membersihkan tag pemikiran, menormalkan tanda baca, membuang emoji AI, dan memotong ayat tergantung.
+    Membersihkan tag pemikiran, menormalkan tanda baca, membuang emoji AI, dan membuang baris tajuk berulang.
     """
     if not text:
         return ""
@@ -173,10 +170,15 @@ def clean_ai_output(text: str) -> str:
         "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
         flags=re.UNICODE,
     )
-    cleaned = emoji_pattern.sub("", cleaned)
-    cleaned = cleaned.strip().strip('"').strip("'")
-    cleaned = trim_to_last_sentence(cleaned)
+    cleaned = emoji_pattern.sub("", cleaned).strip().strip('"').strip("'")
 
+    # Buang baris pertama jika AI menjana tajuk/header dengan 'Tajuk:', 'Title:', atau simbol ✨
+    lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
+    if lines and (lines[0].lower().startswith("tajuk") or lines[0].lower().startswith("title") or lines[0].startswith("✨")):
+        lines.pop(0)
+    cleaned = " ".join(lines)
+
+    cleaned = trim_to_last_sentence(cleaned)
     return cleaned.strip()
 
 
@@ -218,7 +220,7 @@ def generate_fallback_fb_story(product_name: str, brand: str) -> str:
 
 def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
     """
-    Menghasilkan ulasan santai Bahasa Melayu bagi Facebook dengan kefahaman masa MYT & nama produk mesra.
+    Menghasilkan ulasan santai Bahasa Melayu bagi Facebook dengan kefahaman masa MYT & terus bermula dengan penceritaan.
     """
     raw_name = payload.get("shopee_product_name", "")
     clean_name = clean_shopee_title_for_prompt(raw_name)
@@ -242,15 +244,15 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
         "praktikal, dan suka berkongsi barang rumah berguna di Facebook.\n\n"
         "Tugasan Utama:\n"
         "1. Fahami fungsi utama produk daripada tajuk dan rujukan visual English yang diberikan.\n"
-        "2. Ringkaskan tajuk panjang Shopee kepada panggilan harian yang mesra dan pendek dalam ayat (contoh: 'tisu basah dapur ni', 'rak rempah bertingkat ni', 'mesin rumput bateri ni', 'tumbler tahan sejuk ni').\n"
-        "3. Tulis 1 perenggan ulasan santai gaya Mama dalam Bahasa Melayu Malaysia tulen (sekitar 40 hingga 65 patah perkataan).\n"
-        "4. Mulakan dengan situasi harian atau masalah yang diselesaikan (contoh: bila dapur berminyak / barang bersepah / nak kemaskan ruang) dan jelaskan bagaimana barang ini memudahkan kerja rumah.\n"
-        "5. Masukkan panggilan ringkas produk tadi secara natural dalam penceritaan sebagai promosi lembut.\n\n"
+        "2. Tulis 1 perenggan ulasan santai gaya Mama dalam Bahasa Melayu Malaysia tulen (sekitar 40 hingga 65 patah perkataan).\n"
+        "3. TERUS MULA dengan situasi harian atau masalah yang diselesaikan (contoh: bila sinki tersumbat / dapur berminyak / barang bersepah).\n"
+        "4. Masukkan nama panggilan ringkas produk (contoh: 'ubat sinki ni', 'rak cawan kayu ni', 'kabinet TV rotan ni') secara natural di dalam penceritaan sebagai promosi santai.\n\n"
         "Pantangan Ketat:\n"
-        "- DILARANG sebut harga atau sebut 'RM' (sistem akan pasang harga automatik).\n"
+        "- DILARANG meletakkan tajuk produk di baris pertama (jangan buat headline/header, terus masuk perenggan cerita).\n"
+        "- DILARANG sebut harga atau sebut 'RM' (sistem akan pasang harga automatik di bawah).\n"
         "- DILARANG letak sebarang URL atau pautan Shopee di dalam ayat.\n"
         "- DILARANG letak sebarang emoji sama sekali (kod python akan letak emoji).\n"
-        "- DILARANG guna bahasa Indonesia (haramkan perkataan: bisa, banget, nggak, ngak, yuk, bikin, gampang, cobain).\n"
+        "- DILARANG guna perkataan Indonesia (seperti bisa, banget, nggak, ngak, yuk, bikin, gampang, cobain, cocok).\n"
         "- Gunakan istilah harian Melayu (contoh: senang nak lap, kemas terletak, tak serabut mata, jimat ruang, tak pening kepala).\n"
         "- Pastikan perenggan lengkap dan berakhir dengan tanda noktah (.).\n"
         "- Terus berikan teks ulasan tanpa sebarang mukadimah atau tag pemikiran."
@@ -261,7 +263,7 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
         f"Nama Asal Produk: {clean_name}\n"
         f"Jenama: {brand}\n"
         f"Rujukan Visual (English Mudah): {vision_en}\n\n"
-        f"Sila olah ulasan santai Facebook Mama (pendekkan tajuk jadi panggilan mesra dalam ayat):"
+        f"Sila olah ulasan santai Facebook Mama (terus mula penceritaan tanpa sebarang baris tajuk di atas):"
     )
 
     for model_name in models:
@@ -302,24 +304,14 @@ def generate_mama_fb_copy(payload: Dict[str, Any]) -> str:
 
 def assemble_fb_post_and_comment(payload: Dict[str, Any], mama_story_bm: str) -> Tuple[str, str]:
     """
-    Menggabungkan teks hantaran FB (500-750 aksara) dan teks komen affiliate secara terkunci:
-    - Post Caption: Tajuk pendek ringkas + Emoji kod + Cerita Mama + Harga Terkunci + Hashtags
-    - Comment: Pautan Affiliate Shopee asli
+    Menggabungkan teks hantaran FB secara kemas tanpa tajuk header di baris atas.
     """
-    product_name = payload.get("shopee_product_name", "")
-    clean_title = clean_shopee_title_for_prompt(product_name)
     price = float(payload.get("shopee_price", 0.0))
     affiliate_link = payload.get("shopee_affiliate_link", "").strip()
-
-    # Potong tajuk pendek kemas
-    short_title = clean_title.split("|")[0].split("-")[0].strip()
-    if len(short_title) > 55:
-        short_title = short_title[:52] + "..."
 
     hashtags = "#ImpianRumahku #CeritaMama #KemasRumah #TipsSuriRumah #RacunShopee"
 
     post_caption = (
-        f"✨ {short_title}\n\n"
         f"{mama_story_bm}\n\n"
         f"💰 Harga Mesra Poket: RM{price:.2f}\n"
         f"📌 Mama dah letak link barang ni di ruangan komen pertama di bawah ya! 👇\n\n"
@@ -432,7 +424,7 @@ def run_facebook_pipeline() -> Tuple[bool, str]:
     print("=" * 70)
     print(post_caption)
     print("-" * 70)
-    print(f"📏 Jumlah Aksara Hantaran: {char_len} aksara (Sasaran: 500-750 aksara)")
+    print(f"📏 Jumlah Aksara Hantaran: {char_len} aksara (Sasaran: 450-700 aksara)")
     print("\n💬 [PRATONTON KOMEN PERTAMA AFFILIATE]")
     print("-" * 70)
     print(comment_text)

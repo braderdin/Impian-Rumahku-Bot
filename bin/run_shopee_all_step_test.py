@@ -8,7 +8,7 @@ Pipeline Sequence:
 - Step 1: Fetch candidate from Supabase & filter via Upstash Redis (30d) / Vector DB (2d)
 - Step 2: Download image & generate Vision Review in Simple English (Plain English A2/B1)
 - Step 3: AI Copywriter Persona Mama BM Translations & Captions Generation:
-  * 3A: Facebook Page Post & 1st Comment (500 - 750 chars)
+  * 3A: Facebook Page Post & 1st Comment (450 - 750 chars, No Top Header)
   * 3B: Instagram Feed Caption (400 - 600 chars)
   * 3C: Meta Threads Caption (<= 490 chars)
   * 3D: Bluesky Micro-post (<= 280 chars)
@@ -231,7 +231,7 @@ def run_all_step_diagnostic():
     # =========================================================================
     print_step_header(3, "Olahan Copywriting Persona Mama (BM) Merentasi 4 Platform")
 
-    print("\n⏳ [3A] Menjana Ulasan Facebook Page (Story + 1st Comment)...")
+    print("\n⏳ [3A] Menjana Ulasan Facebook Page (Story Direct Hook + 1st Comment)...")
     fb_story = generate_mama_fb_copy(vision_payload)
     fb_caption, fb_comment = assemble_fb_post_and_comment(vision_payload, fb_story)
 
