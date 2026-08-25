@@ -17,6 +17,7 @@ import time
 import json
 import requests
 from pathlib import Path
+from typing import Tuple, Dict, Any, Optional
 from dotenv import load_dotenv
 
 # Setup Project Root Path
