@@ -66,60 +66,6 @@ def print_memory_log(stage_name: str):
     print("-" * 65)
 
 
-def fetch_and_prepare_4_images() -> List[Dict[str, Any]]:
-    """
-    Menarik 40 imej daripada Unsplash dalam 1 request, memilih 4 imej, 
-    dan memampatkan setiap imej kepada < 40KB Base64.
-    """
-    unsplash_key = os.getenv("IRCM_UNSPLASH_ACCESS_KEY", "").strip() or os.getenv("UNSPLASH_ACCESS_KEY", "").strip()
-    if not unsplash_key:
-        print("⚠️ [UNSPLASH] Kunci IRCM_UNSPLASH_ACCESS_KEY tiada. Menggunakan imej placeholder sintetik.")
-        return generate_synthetic_benchmark_images(4)
-
-    url = "https://api.unsplash.com/search/photos"
-    params = {
-        "query": "malaysian home kitchen plants interior",
-        "per_page": 40,
-        "page": 1,
-        "client_id": unsplash_key
-    }
-
-    print("📡 [UNSPLASH] Menghantar 1 request untuk menarik 40 data imej...")
-    try:
-        res = requests.get(url, params=params, timeout=20)
-        if res.status_code != 200:
-            print(f"⚠️ [UNSPLASH ERROR] HTTP {res.status_code}: {res.text}")
-            return generate_synthetic_benchmark_images(4)
-
-        results = res.json().get("results", [])
-        if len(results) < 4:
-            return generate_synthetic_benchmark_images(4)
-
-        selected_4 = results[:4]
-        prepared_images = []
-
-        for idx, item in enumerate(selected_4, 1):
-            img_url = item.get("urls", {}).get("regular") or item.get("urls", {}).get("small")
-            img_res = requests.get(img_url, timeout=15)
-            
-            if img_res.status_code == 200:
-                # Mampatkan ke bawah 40KB
-                b64_str, size_kb = compress_bytes_to_b64(img_res.content, max_kb=40)
-                prepared_images.append({
-                    "id": item.get("id", f"img_{idx}"),
-                    "desc": item.get("alt_description") or "Visual hiasan rumah",
-                    "size_kb": size_kb,
-                    "b64": b64_str
-                })
-                print(f"   🖼️ Gambar #{idx} dimampatkan: {size_kb:.2f} KB (ID: {item.get('id')})")
-
-        return prepared_images if len(prepared_images) == 4 else generate_synthetic_benchmark_images(4)
-
-    except Exception as e:
-        print(f"⚠️ [UNSPLASH EXCEPTION] {e}")
-        return generate_synthetic_benchmark_images(4)
-
-
 def compress_bytes_to_b64(raw_bytes: bytes, max_kb: int = 40) -> Tuple[str, float]:
     """Memampatkan data gambar kepada JPEG < 40KB dan menukar ke Base64 Data URL."""
     img = Image.open(BytesIO(raw_bytes))
@@ -164,6 +110,59 @@ def generate_synthetic_benchmark_images(count: int = 4) -> List[Dict[str, Any]]:
     return images
 
 
+def fetch_and_prepare_4_images() -> List[Dict[str, Any]]:
+    """
+    Menarik 40 imej daripada Unsplash dalam 1 request, memilih 4 imej, 
+    dan memampatkan setiap imej kepada < 40KB Base64.
+    """
+    unsplash_key = os.getenv("IRCM_UNSPLASH_ACCESS_KEY", "").strip() or os.getenv("UNSPLASH_ACCESS_KEY", "").strip()
+    if not unsplash_key:
+        print("⚠️ [UNSPLASH] Kunci IRCM_UNSPLASH_ACCESS_KEY tiada. Menggunakan imej placeholder sintetik.")
+        return generate_synthetic_benchmark_images(4)
+
+    url = "https://api.unsplash.com/search/photos"
+    params = {
+        "query": "malaysian home kitchen plants interior",
+        "per_page": 40,
+        "page": 1,
+        "client_id": unsplash_key
+    }
+
+    print("📡 [UNSPLASH] Menghantar 1 request untuk menarik 40 data imej...")
+    try:
+        res = requests.get(url, params=params, timeout=20)
+        if res.status_code != 200:
+            print(f"⚠️ [UNSPLASH ERROR] HTTP {res.status_code}: {res.text}")
+            return generate_synthetic_benchmark_images(4)
+
+        results = res.json().get("results", [])
+        if len(results) < 4:
+            return generate_synthetic_benchmark_images(4)
+
+        selected_4 = results[:4]
+        prepared_images = []
+
+        for idx, item in enumerate(selected_4, 1):
+            img_url = item.get("urls", {}).get("regular") or item.get("urls", {}).get("small")
+            img_res = requests.get(img_url, timeout=15)
+            
+            if img_res.status_code == 200:
+                b64_str, size_kb = compress_bytes_to_b64(img_res.content, max_kb=40)
+                prepared_images.append({
+                    "id": item.get("id", f"img_{idx}"),
+                    "desc": item.get("alt_description") or "Visual hiasan rumah",
+                    "size_kb": size_kb,
+                    "b64": b64_str
+                })
+                print(f"   🖼️ Gambar #{idx} dimampatkan: {size_kb:.2f} KB (ID: {item.get('id')})")
+
+        return prepared_images if len(prepared_images) == 4 else generate_synthetic_benchmark_images(4)
+
+    except Exception as e:
+        print(f"⚠️ [UNSPLASH EXCEPTION] {e}")
+        return generate_synthetic_benchmark_images(4)
+
+
 def send_telegram_audit_report(report_data: Dict[str, Any]):
     """Menghantar laporan audit terperinci ke Telegram."""
     bot_token = os.getenv("IRCM_TELEGRAM_BOT_TOKEN", "").strip()
@@ -180,11 +179,11 @@ def send_telegram_audit_report(report_data: Dict[str, Any]):
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"<b>Status:</b> {status_icon}\n"
         f"<b>Model:</b> {MODEL_FILENAME}\n"
-        f"<b>Vision Handler:</b> {MMPROJ_FILENAME}\n"
+        f"<b>Vision Handler:</b> {report_data.get('handler_used', MMPROJ_FILENAME)}\n"
         f"<b>Context Window Ditetapkan:</b> {TEST_CONTEXT_WINDOW:,} Tokens\n"
         f"<b>Max Output Token:</b> {TEST_MAX_OUTPUT_TOKENS:,} Tokens\n"
         f"<b>KV Cache:</b> Q8_0 (8-bit Quantized)\n"
-        f"<b>Reasoning Mode:</b> Aktif (<think>)\n"
+        f"<b>Reasoning Mode:</b> Aktif (&lt;think&gt;)\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n"
         f"⏱️ <b>Masa Model Loading:</b> {report_data.get('load_time_sec', 0):.2f}s\n"
         f"⏱️ <b>Masa Inferens:</b> {report_data.get('inference_time_sec', 0):.2f}s\n"
@@ -226,16 +225,32 @@ def run_benchmark():
     # 1. Muat Turun / Semak Fail Model
     from huggingface_hub import hf_hub_download
     from llama_cpp import Llama
-    from llama_cpp.llama_chat_format import Qwen2VLChatHandler
 
     t0_load = time.time()
     print(f"📥 Memuat turun / memuatkan {MODEL_FILENAME} & {MMPROJ_FILENAME}...")
     model_path = hf_hub_download(repo_id=REPO_ID, filename=MODEL_FILENAME, local_files_only=False)
     mmproj_path = hf_hub_download(repo_id=REPO_ID, filename=MMPROJ_FILENAME, local_files_only=False)
 
-    # 2. Inisialisasi Vision Handler & Model Llama
-    chat_handler = Qwen2VLChatHandler(clip_model_path=mmproj_path)
+    # 2. Pemuat Selamat Vision Chat Handler (Dynamic Fallback)
+    chat_handler = None
+    handler_name = "None"
+    
+    try:
+        from llama_cpp.llama_chat_format import Qwen2VLChatHandler
+        chat_handler = Qwen2VLChatHandler(clip_model_path=mmproj_path)
+        handler_name = "Qwen2VLChatHandler"
+        print("👁️ [VISION HANDLER] Berjaya memuatkan Qwen2VLChatHandler.")
+    except Exception:
+        try:
+            from llama_cpp.llama_chat_format import Llava15ChatHandler
+            chat_handler = Llava15ChatHandler(clip_model_path=mmproj_path)
+            handler_name = "Llava15ChatHandler (Fallback)"
+            print("👁️ [VISION HANDLER] Berjaya fallback kepada Llava15ChatHandler.")
+        except Exception as e:
+            handler_name = f"Failed ({e})"
+            print(f"⚠️ [VISION HANDLER WARN] Tidak dapat memuatkan chat handler khas: {e}")
 
+    # 3. Inisialisasi Model Llama
     print(f"⚙️ Mengkonfigurasi Llama: n_ctx={TEST_CONTEXT_WINDOW}, type_k=8 (Q8), type_v=8 (Q8), flash_attn=True...")
     llm = Llama(
         model_path=model_path,
@@ -252,11 +267,11 @@ def run_benchmark():
     print(f"✅ Model berjaya dimuatkan dalam masa {load_duration:.2f} saat.")
     print_memory_log("SELEPAS MODEL DIMUATKAN (KV CACHE DISEDIAKAN)")
 
-    # 3. Sediakan 4 Imej Unsplash
+    # 4. Sediakan 4 Imej Unsplash (< 40KB)
     images_payload = fetch_and_prepare_4_images()
     print_memory_log("SELEPAS 4 GAMBAR DIPROSES")
 
-    # 4. Bina Kandungan Mesej
+    # 5. Bina Kandungan Mesej
     system_prompt = (
         "Anda ialah pakar analisis visual dan gaya hidup harian di Malaysia. "
         "Tugasan anda adalah meneliti gambar-gambar yang diberikan dan membina penilaian terperinci "
@@ -292,6 +307,7 @@ def run_benchmark():
     
     audit_data: Dict[str, Any] = {
         "status": "FAILED",
+        "handler_used": handler_name,
         "load_time_sec": load_duration,
         "inference_time_sec": 0,
         "tokens_generated": 0,
@@ -302,7 +318,6 @@ def run_benchmark():
     }
 
     try:
-        # Parameter rasmi Qwen3.5 untuk mod reasoning
         response = llm.create_chat_completion(
             messages=messages,
             temperature=1.0,
@@ -322,7 +337,7 @@ def run_benchmark():
         print(f"\n🎉 [INFERENS SELESAI] Masa: {infer_duration:.2f}s | Token: {completion_tokens} | Kelajuan: {tok_per_sec:.2f} tok/s")
         print_memory_log("KEMUNCAK SELEPAS INFERENS")
 
-        # 5. Simpan Hasil JSON Unik
+        # 6. Simpan Hasil JSON Unik
         unique_id = f"{int(time.time())}_{uuid.uuid4().hex[:6]}"
         output_json_path = TEMP_DIR / f"qwen35_benchmark_{unique_id}.json"
 
@@ -330,6 +345,7 @@ def run_benchmark():
             "benchmark_meta": {
                 "timestamp": int(time.time()),
                 "model": MODEL_FILENAME,
+                "handler_used": handler_name,
                 "context_window_setting": TEST_CONTEXT_WINDOW,
                 "max_output_setting": TEST_MAX_OUTPUT_TOKENS,
                 "kv_cache": "Q8_0",
@@ -349,7 +365,6 @@ def run_benchmark():
 
         print(f"💾 [HASIL DISIMPAN] Fail JSON: {output_json_path}")
 
-        # Kemas kini data audit
         mem_peak = get_system_memory_report()
         audit_data.update({
             "status": "SUCCESS",
@@ -372,7 +387,6 @@ def run_benchmark():
         })
 
     finally:
-        # 6. Hantar Laporan ke Telegram
         send_telegram_audit_report(audit_data)
         print("=" * 70)
 

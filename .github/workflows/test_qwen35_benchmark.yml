@@ -6,11 +6,11 @@ on:
 jobs:
   run-qwen35-benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 120 # Masa diperuntukkan untuk 16k context inferens
+    timeout-minutes: 120
 
     steps:
       - name: Checkout Kod Repositori
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       # 1. Tambah Swap Memory 10GB untuk menampung KV Cache 16K Q8 & Vision
       - name: 🛠️ Bina 10GB Swap Memory di Runner
@@ -28,7 +28,7 @@ jobs:
 
       # 2. Pasang Python 3.11
       - name: Pasang Persekitaran Python 3.11
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
