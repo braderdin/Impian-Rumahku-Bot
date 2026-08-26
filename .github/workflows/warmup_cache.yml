@@ -37,26 +37,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Muat turun dan kunci model Mesolitica terus ke dalam folder ~/.cache/huggingface
-      - name: Pra-Muat Turun Model Mesolitica NanoT5
-        run: |
-          python -c "
-          from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-          model_name = 'mesolitica/nanot5-base-malaysian-translation-v2.1'
-          print('⏳ Mula memuat turun & menyimpan cache:', model_name)
-          AutoTokenizer.from_pretrained(model_name)
-          AutoModelForSeq2SeqLM.from_pretrained(model_name)
-          print('✅ Model Mesolitica berjaya dimuat turun dan dikunci ke ~/.cache/huggingface')
-          "
-
-      # Muat turun dan kunci model Qwen 2.5 3B GGUF (~2.1 GB) ke dalam ~/.cache/huggingface
-      - name: Pra-Muat Turun Model Qwen 2.5 3B GGUF
+      # Muat turun dan kunci model Qwen3.5-4B GGUF & Vision Projector mmproj-F16 (~3.41 GB)
+      - name: Pra-Muat Turun Model Qwen3.5-4B (Q4_K_M) & mmproj-F16 GGUF
         run: |
           python -c "
           from huggingface_hub import hf_hub_download
-          repo_id = 'Qwen/Qwen2.5-3B-Instruct-GGUF'
-          filename = 'qwen2.5-3b-instruct-q4_k_m.gguf'
-          print(f'⏳ Mula memuat turun & mengunci model GGUF: {repo_id}/{filename}')
-          path = hf_hub_download(repo_id=repo_id, filename=filename, local_files_only=False)
-          print('✅ Model Qwen 2.5 3B GGUF berjaya dimuat turun dan dikunci:', path)
+          repo_id = 'unsloth/Qwen3.5-4B-GGUF'
+          files = ['Qwen3.5-4B-Q4_K_M.gguf', 'mmproj-F16.gguf']
+          
+          for filename in files:
+              print(f'⏳ Mula memuat turun & mengunci: {repo_id}/{filename}')
+              path = hf_hub_download(repo_id=repo_id, filename=filename, local_files_only=False)
+              print(f'✅ Fail berjaya dimuat turun dan dikunci: {path}')
           "
