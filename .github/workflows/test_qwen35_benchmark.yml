@@ -1,0 +1,70 @@
+name: Test Qwen3.5 4B GGUF Benchmark (16K Context & Reasoning)
+
+on:
+  workflow_dispatch: # Butang trigger manual di GitHub Actions UI
+
+jobs:
+  run-qwen35-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120 # Masa diperuntukkan untuk 16k context inferens
+
+    steps:
+      - name: Checkout Kod Repositori
+        uses: actions/checkout@v7
+
+      # 1. Tambah Swap Memory 10GB untuk menampung KV Cache 16K Q8 & Vision
+      - name: 🛠️ Bina 10GB Swap Memory di Runner
+        run: |
+          echo "=== MEMORI ASAL RUNNER ==="
+          free -h
+          sudo swapoff -a || true
+          sudo fallocate -l 10G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo sysctl vm.swappiness=60
+          echo "=== MEMORI SELEPAS 10GB SWAP DIAKTIFKAN ==="
+          free -h
+
+      # 2. Pasang Python 3.11
+      - name: Pasang Persekitaran Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      # 3. Pulihkan Cache Hugging Face & Pip
+      - name: ⚡ Pulihkan Cache (Pip & Model Weights)
+        id: pipeline-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-ircm-cache-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-ircm-cache-
+
+      # 4. Pasang Pustaka
+      - name: 📦 Pasang Pustaka Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install psutil
+
+      # 5. Jalankan Skrip Eksperimen Benchmark
+      - name: 🚀 Jalankan Benchmark Qwen3.5-4B GGUF
+        env:
+          IRCM_UNSPLASH_ACCESS_KEY: ${{ secrets.IRCM_UNSPLASH_ACCESS_KEY }}
+          IRCM_TELEGRAM_BOT_TOKEN: ${{ secrets.IRCM_TELEGRAM_BOT_TOKEN }}
+          IRCM_TELEGRAM_CHAT_ID: ${{ secrets.IRCM_TELEGRAM_CHAT_ID }}
+        run: |
+          python experiments/Qwen3.5-4B-GGUF/test_qwen35_benchmark.py
+
+      # 6. Simpan Artifak JSON Hasil
+      - name: 💾 Simpan Artifak Keputusan JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen35-benchmark-results
+          path: temp/qwen35_benchmark_*.json
+          retention-days: 7

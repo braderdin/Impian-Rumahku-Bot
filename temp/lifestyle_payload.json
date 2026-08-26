@@ -1,69 +1,67 @@
 {
-  "step": 2,
-  "topic_id": "life_1787741611_2_18",
-  "topic_lock_text": "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat bahan dapur, cara perap lauk mudah, atau idea minum petang. variasi 06:53 PM",
+  "topic_id": "life_1787748492_2_20",
+  "topic_lock_text": "Santai Anak, Rumah Tangga & Hujung Minggu - Screen Time Updates from AAP (Variasi Waktu Awal Malam)",
   "datetime": {
-    "timestamp": 1787741611,
+    "timestamp": 1787748467,
     "day_name": "Rabu",
     "day_index": 2,
     "date_str": "26 Ogos 2026",
-    "time_str": "06:53 PM",
-    "hour": 18,
-    "period": "Petang",
-    "period_context": "Waktu petang santai, siram pokok di laman atau sediakan minum petang untuk keluarga.",
-    "formatted_full": "Rabu, 26 Ogos 2026, 06:53 PM"
+    "time_str": "08:47 PM",
+    "hour": 20,
+    "minute": 47,
+    "period": "Awal Malam",
+    "period_context": "Waktu makan malam keluarga, kemas meja makan dan dapur lepas makan, atau sembang santai di ruang tamu bersama anak-anak.",
+    "formatted_full": "Rabu, 26 Ogos 2026, 08:47 PM"
   },
   "mood": {
-    "mood_name": "Santai Pertengahan Minggu",
-    "tone_description": "Santai, bersahaja, berkongsi rasa lega bila kerja rumah selesai awal.",
-    "time_phase": "Petang"
+    "mood_name": "Santai Pertengahan Minggu & Laman Hijau",
+    "tone_description": "Santai, bersahaja, berkongsi rasa seronok bila kerja rumah siap awal sambil belek pokok.",
+    "time_phase": "Awal Malam"
   },
   "niche": {
-    "niche_key": "makanan",
-    "niche_title": "Makanan, Resepi Ringkas & Dapur Mama",
-    "prompt_hook": "Cerita aroma masakan harian, resepi jimat bahan dapur, cara perap lauk mudah, atau idea minum petang.",
+    "niche_key": "santai_keluarga",
+    "niche_title": "Santai Anak, Rumah Tangga & Hujung Minggu",
+    "prompt_hook": "Aktiviti santai bersama anak-anak di rumah, sediakan kudapan, atau luahan rasa bahagia menguruskan keluarga.",
     "suggested_subreddits": [
-      "MalaysianFood",
-      "EatCheapAndHealthy"
+      "Parenting",
+      "happy",
+      "CasualConversation",
+      "CozyPlaces"
     ]
   },
   "recent_memories": [
-    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat",
-    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat",
-    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat",
-    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat"
+    "Santai Anak, Rumah Tangga & Hujung Minggu - Aktiviti santai bersama anak-anak di",
+    "Santai Anak, Rumah Tangga & Hujung Minggu - Screen Time Updates from AAP (Varias",
+    "Santai Anak, Rumah Tangga & Hujung Minggu - Screen Time Updates from AAP",
+    "Tip Tambah Pendapatan Sampingan & Affiliate - Pengalaman suri rumah tambah duit "
   ],
-  "reddit_source": {},
-  "local_image_path": "",
-  "engine_used": "OPENROUTER (dots-studio/dots-3-note-preview:free)",
-  "total_duration_sec": 0.0,
-  "ai_captions": {
-    "facebook": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat. Cukup perah sedikit limau kapas, campur gula melaka yang dileburkan dengan air panas, kemudian tambah air sejuk dan ais batu. Aroma limau kapas yang segar tu memang buat hati tenang. Anak-anak pun senang minum ni, Mama boleh tambah sedikit daun pudina kalau nak rasa lebih segar.",
-    "instagram": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat. Cukup perah sedikit limau kapas, campur gula melaka yang dileburkan dengan air panas, kemudian tambah air sejuk dan ais batu. Aroma limau kapas yang segar tu memang buat hati tenang. Anak-anak pun senang minum ni, Mama boleh tambah sedikit daun pudina kalau nak rasa lebih segar.",
-    "threads": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat. Cukup perah sedikit limau kapas, campur gula melaka yang dileburkan dengan air panas, kemudian tambah air sejuk dan ais batu. Aroma limau kapas yang segar tu memang buat hati tenang. Anak-anak pun senang minum ni, Mama boleh tambah sedikit daun pudina kalau nak rasa lebih segar.",
-    "bluesky": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat."
+  "reddit_source": {
+    "source_platform": "reddit",
+    "source_engine": "RSS_ATOM_FEED",
+    "subreddit": "Parenting",
+    "post_id": "1qowu9w",
+    "title": "Screen Time Updates from AAP",
+    "description": "Digital Ecosystems, Children, and Adolescents: Policy Statement    Adding this to highlights for a while since there are often so many questions about screentime. What's okay, what's not okay, how to let your child have an appropriate relationship with screens and media.    If you have a chance to read it, its very interesting and gives suggestions for different ages and stages.",
+    "permalink": "https://www.reddit.com/r/Parenting/comments/1qowu9w/screen_time_updates_from_aap/",
+    "author": "MableXeno",
+    "score": 50,
+    "curated_at": 1787748471
   },
-  "post_results": {
-    "facebook": {
-      "status": "success",
-      "post_id": "1353740547811893_122102159397450068",
-      "char_count": 453
-    },
-    "instagram": {
-      "status": "skipped",
-      "reason": "text_only_no_image"
-    },
-    "threads": {
-      "status": "success",
-      "thread_id": "18024668177692753",
-      "char_count": 453
-    },
-    "bluesky": {
-      "status": "success",
-      "uri": "at://did:plc:nrwxc2ntoi3fmj3ihzbgroge/app.bsky.feed.post/3mty6aln5wf2z",
-      "char_count": 173
-    }
+  "unsplash_image": {
+    "source": "UNSPLASH_API",
+    "photo_id": "dcTDSnEh31A",
+    "keyword_used": "minimalist cozy kitchen setup",
+    "local_path": "/home/braderdin/Impian-Rumahku-Bot/temp/curated_unsplash.jpg",
+    "size_kb": 25,
+    "author": "Clay Banks",
+    "description": "A kitchen filled with lots of counter top space"
   },
-  "created_at": "2026-08-26 18:53:31",
-  "generation_duration_sec": 55.36
+  "local_image_path": "/home/braderdin/Impian-Rumahku-Bot/temp/curated_unsplash.jpg",
+  "persona_profile": {
+    "name": "Mama",
+    "community": "Impian Rumahku & Cerita Mama",
+    "identity": "Wanita Melayu awal 30-an, suri rumah berdikari, mesra, praktikal, dan bercakap santai tanpa gaya kaku.",
+    "language_rule": "Bahasa Melayu harian Malaysia tulen sahaja. WAJIB bahasakan diri 'Mama'. DILARANG guna istilah Indonesia, DILARANG emoji, DILARANG simbol asing."
+  },
+  "created_at": 1787748492
 }
