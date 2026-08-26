@@ -189,13 +189,13 @@ def extract_json_array_robust(text: str) -> List[str]:
 
 def generate_10_visual_keywords(title: str, description: str) -> List[str]:
     """
-    Menggunakan OpenRouter Primary (atau fallback) untuk menjana 10 kata kunci carian Unsplash.
+    Menggunakan OpenRouter Primary (dibaca daripada env) untuk menjana 10 kata kunci carian Unsplash.
     """
     base_url = os.getenv("IRCM_OPENROUTER_BASE_URL", "").strip()
     api_key = os.getenv("IRCM_OPENROUTER_API_KEY", "").strip()
-    model = os.getenv("IRCM_MODEL_PRIMARY", "").strip() or "google/gemma-4-26b-a4b-it:free"
+    model = os.getenv("IRCM_MODEL_PRIMARY", "").strip()
 
-    if not base_url or not api_key:
+    if not base_url or not api_key or not model:
         return SAFE_TECH_KEYWORDS
 
     endpoint = base_url if base_url.endswith("/chat/completions") else f"{base_url.rstrip('/')}/chat/completions"
@@ -297,9 +297,10 @@ def select_and_curate_unsplash_image() -> Optional[Dict[str, Any]]:
     title = reddit_data.get("title", "Rutin Harian Mama")
     description = reddit_data.get("description", "Inspirasi kehidupan suri rumah")
 
-    unsplash_access_key = os.getenv("UNSPLASH_ACCESS_KEY", "").strip()
+    # Membaca kunci IRCM_UNSPLASH_ACCESS_KEY
+    unsplash_access_key = os.getenv("IRCM_UNSPLASH_ACCESS_KEY", "").strip() or os.getenv("UNSPLASH_ACCESS_KEY", "").strip()
     if not unsplash_access_key:
-        print("⚠️ [STEP 3 WARN] Kunci UNSPLASH_ACCESS_KEY tiada dalam persekitaran.")
+        print("⚠️ [STEP 3 WARN] Kunci IRCM_UNSPLASH_ACCESS_KEY tiada dalam persekitaran.")
         return None
 
     print(f"🔍 [STEP 3] Menjana 10 kata kunci visual berdasarkan tajuk: '{title[:40]}...'")

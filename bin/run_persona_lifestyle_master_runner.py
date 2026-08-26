@@ -92,6 +92,9 @@ def check_environment_variables() -> bool:
             ("IRCM_B2_APPLICATION_KEY", "B2_APPLICATION_KEY"),
             ("IRCM_B2_BUCKET_NAME", "B2_BUCKET_NAME"),
         ],
+        "Unsplash Media Provider": [
+            ("IRCM_UNSPLASH_ACCESS_KEY", "UNSPLASH_ACCESS_KEY"),
+        ],
     }
 
     critical_services = ["Upstash Redis DB", "Upstash Vector DB", "Telegram Audit Bot"]

@@ -71,6 +71,11 @@ jobs:
           IRCM_BLUESKY_HANDLE: ${{ secrets.IRCM_BLUESKY_HANDLE }}
           IRCM_BLUESKY_APP_PASSWORD: ${{ secrets.IRCM_BLUESKY_APP_PASSWORD }}
           
+          # Media Providers (Unsplash)
+          IRCM_UNSPLASH_APPLICATION_ID: ${{ secrets.IRCM_UNSPLASH_APPLICATION_ID }}
+          IRCM_UNSPLASH_ACCESS_KEY: ${{ secrets.IRCM_UNSPLASH_ACCESS_KEY }}
+          IRCM_UNSPLASH_SECRET_KEY: ${{ secrets.IRCM_UNSPLASH_SECRET_KEY }}
+          
           # Storage Bridge (Meta Ephemeral Media)
           IRCM_B2_KEY_ID: ${{ secrets.IRCM_B2_KEY_ID }}
           IRCM_B2_APPLICATION_KEY: ${{ secrets.IRCM_B2_APPLICATION_KEY }}
