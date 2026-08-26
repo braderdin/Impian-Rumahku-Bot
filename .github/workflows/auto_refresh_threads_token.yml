@@ -2,8 +2,8 @@ name: Auto Refresh Threads Token
 
 on:
   schedule:
-    # Berjalan setiap 2 hari sekali pada jam 02:00 UTC (10:00 AM Waktu Malaysia)
-    - cron: '0 2 */2 * *'
+    # Berjalan setiap 5 hari sekali pada jam 02:00 UTC (10:00 AM Waktu Malaysia)
+    - cron: '0 2 */5 * *'
   workflow_dispatch: # Membolehkan ujian manual dari tab Actions di GitHub
 
 jobs:
