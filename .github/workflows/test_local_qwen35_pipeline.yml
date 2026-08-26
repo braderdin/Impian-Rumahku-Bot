@@ -1,0 +1,59 @@
+name: Test Local Qwen3.5-4B (Q4_K_M) Vision Dual-Stage
+
+on:
+  workflow_dispatch: # Manual trigger dari GitHub Actions UI
+
+jobs:
+  test-qwen35-dual-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Kod Repositori
+        uses: actions/checkout@v4
+
+      - name: Pasang Persekitaran Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Cache Model Qwen3.5-4B Q4_K_M (~2.74 GB) & mmproj-F16 (~672 MB)
+      - name: Pulihkan / Simpan Cache Hugging Face GGUF & VLM
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: ${{ runner.os }}-hf-qwen35-4b-q4km-v1
+          restore-keys: |
+            ${{ runner.os }}-hf-qwen35-4b-q4km-
+
+      # Cache wheel & pakej pip
+      - name: Pulihkan / Simpan Cache Pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-qwen35-test-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-qwen35-test-
+
+      - name: Pasang Pustaka & llama-cpp-python (Prebuilt CPU Wheel)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install huggingface-hub python-dotenv requests pillow
+          
+          # Pasang prebuilt binary CPU llama-cpp-python (< 10 saat)
+          pip install llama-cpp-python \
+            --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+
+      - name: Jalankan Saluran Ujian Qwen3.5-4B Dual-Stage
+        env:
+          IRCM_SUPABASE_URL: ${{ secrets.IRCM_SUPABASE_URL }}
+          IRCM_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.IRCM_SUPABASE_SERVICE_ROLE_KEY }}
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_UPSTASH_VECTOR_REST_URL: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_URL }}
+          IRCM_UPSTASH_VECTOR_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_TOKEN }}
+          IRCM_TELEGRAM_BOT_TOKEN: ${{ secrets.IRCM_TELEGRAM_BOT_TOKEN }}
+          IRCM_TELEGRAM_CHAT_ID: ${{ secrets.IRCM_TELEGRAM_CHAT_ID }}
+        run: |
+          python experiments/local_llm/test_pipeline_local_qwen35.py
