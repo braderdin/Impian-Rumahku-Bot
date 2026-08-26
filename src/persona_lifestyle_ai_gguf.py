@@ -2,10 +2,12 @@
 """
 Persona Lifestyle Mama: Dedicated Local GGUF Engine
 Location: src/persona_lifestyle_ai_gguf.py
+
 Features:
 - Powered by unsloth/Qwen3.5-4B-GGUF (Q4_K_M + mmproj-F16).
 - Preserves the original proven prompt & generation logic from commit e9653a9.
 - Generates 1 comprehensive Persona Mama story in BM and adapts to 4 platforms.
+- Strict Indonesian & Slang Scrubber: Enforces 'Mama' and replaces all Indonesian/unnatural vocabulary.
 """
 
 import os
@@ -42,7 +44,7 @@ _LOCAL_LLM_INSTANCE = None
 
 
 def get_or_load_local_qwen35(require_vision: bool = False):
-    """Memuatkan model tempatan Qwen3.5-4B ke dalam memori."""
+    """Memuatkan model tempatan Qwen3.5-4B ke dalam memori RAM/CPU."""
     global _LOCAL_LLM_INSTANCE
     if not HAS_LLAMA_CPP:
         return None
@@ -88,25 +90,26 @@ def get_or_load_local_qwen35(require_vision: bool = False):
 
 
 def clean_gguf_output(text: str) -> str:
-    """Membersihkan output teks dan menapis istilah asing."""
+    """Membersihkan output teks, membuang tag AI, dan menapis istilah Indonesia kepada BM tulen."""
     if not text:
         return ""
 
+    # Buang tag pemikiran AI dan blok markdown
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    cleaned = re.sub(r"(?i)here'?s\s+a\s+thinking\s+process[\s\S]*?\n\n", "", cleaned)
     cleaned = re.sub(r"```json\s*", "", cleaned)
     cleaned = re.sub(r"```\s*", "", cleaned)
 
+    # Kamus Penguatkuasaan Tona Mama & Penyingkiran Istilah Asing
     word_replacements = {
         r"\baku\b": "Mama",
         r"\bAku\b": "Mama",
         r"\bsaya\b": "Mama",
         r"\bSaya\b": "Mama",
+        r"\bkantoran\b": "pejabat",
+        r"\bcapek\b": "penat",
         r"\bkulkas\b": "peti sejuk",
-        r"\babu-abu\b": "kelabu",
-        r"\bkamar mandi\b": "bilik air",
-        r"\buang\b": "duit",
-        r"\bAnda\b": "korang",
-        r"\banda\b": "korang",
+        r"\bberantakan\b": "berselerak",
         r"\bbisa\b": "boleh",
         r"\bbanget\b": "sangat",
         r"\bnggak\b": "tak",
@@ -117,12 +120,18 @@ def clean_gguf_output(text: str) -> str:
         r"\bcocok\b": "sesuai",
         r"\byuk\b": "jom",
         r"\bgimana\b": "macam mana",
+        r"\bkamar mandi\b": "bilik air",
+        r"\buang\b": "duit",
+        r"\babu-abu\b": "kelabu",
+        r"\bAnda\b": "korang",
+        r"\banda\b": "korang",
         r"\bRabuh\b": "Rabu",
         r"\bsahul\b": "sempat",
     }
     for pattern, rep in word_replacements.items():
         cleaned = re.sub(pattern, rep, cleaned)
 
+    # Buang simbol rosak & tanda petik aneh
     replacements = {
         "’": "'", "‘": "'", "“": '"', "”": '"',
         "—": "-", "–": "-", "…": "...", "\xa0": " ",
@@ -130,12 +139,14 @@ def clean_gguf_output(text: str) -> str:
     for orig, rep in replacements.items():
         cleaned = cleaned.replace(orig, rep)
 
+    # Buang semua emoji Unicode sama sekali
     emoji_pattern = re.compile(
         "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
         flags=re.UNICODE,
     )
     cleaned = emoji_pattern.sub("", cleaned).strip().strip('"').strip("'")
 
+    # Buang tajuk atau header jika dijana oleh model
     lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
     if lines and (lines[0].lower().startswith("tajuk") or lines[0].lower().startswith("title") or lines[0].startswith("**")):
         lines.pop(0)
@@ -162,7 +173,7 @@ def trim_to_sentence_boundary(text: str, max_chars: int) -> str:
 
 
 def validate_gguf_text(text: str, min_chars: int = 250, max_chars: int = 500) -> Tuple[bool, str]:
-    """Semakan kualiti abjad dan panjang teks."""
+    """Semakan kualiti abjad dan panjang teks ulasan Mama."""
     if not text or len(text) < min_chars:
         return False, f"Teks terlalu pendek ({len(text)} aksara, minima {min_chars})."
     if len(text) > max_chars:
@@ -221,8 +232,8 @@ def generate_lifestyle_captions_gguf(
         "PANTANG LARANG KETAT:\n"
         "- WAJIB bahasakan diri sebagai 'Mama' (DILARANG guna perkataan 'aku' atau 'saya').\n"
         "- DILARANG meletakkan emoji atau simbol grafik sama sekali.\n"
-        "- DILARANG guna istilah Indonesia (kulkas, abu-abu, kamar mandi, uang, anda, banget, bisa, bikin, gampang, yuk, cobain).\n"
-        "- Gunakan perkataan Melayu: kelabu, bilik air, duit, korang, jimat ruang, kemas elok, senang guna, sedap mata memandang.\n"
+        "- DILARANG guna istilah Indonesia (kantoran, capek, kulkas, berantakan, abu-abu, kamar mandi, uang, anda, banget, bisa, bikin, gampang, yuk, cobain).\n"
+        "- Gunakan perkataan Melayu: pejabat, penat, peti sejuk, berselerak, kelabu, bilik air, duit, korang, jimat ruang, kemas elok, senang guna, sedap mata memandang.\n"
         "- DILARANG beritahu ini dihasilkan oleh AI. Tulis seperti manusia sebenar.\n"
         "- DILARANG letak link, hashtag, atau baris tajuk 'Tajuk:'. Terus mula bercerita."
     )

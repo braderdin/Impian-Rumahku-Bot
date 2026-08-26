@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 """
-Persona Lifestyle Mama: Reddit Topic & Visual Curator Engine
+Persona Lifestyle Mama: Reddit Topic & Text Idea Curator Engine (Pure Text Mode)
 Location: src/persona_lifestyle_reddit_reader.py
 
 Features:
-- Fetches trending/hot clean community posts from curated subreddits.
-- Filters out NSFW, stickied/mod posts, and video-only posts.
-- Extracts clean English context & title for AI adaptation.
-- Downloads and compresses up to 4 images to strictly < 50KB each.
-- Integrates with persona_lifestyle_filter to skip previously used posts.
-- Zero Hardcoded API Keys: Uses standard Reddit public JSON endpoints with custom User-Agent.
+- Pure Text & Topic Idea Curator: Zero Reddit image extraction/downloading (prevents XML parsing & 403 image block errors).
+- Dual-Engine Ingestion: Uses Reddit JSON API first, automatically falls back to RSS/Atom XML on HTTP 403/blocks.
+- Content Cleaners: Strips HTML entities, markdown tags, spoilers, and external URLs.
+- Deduplication Guardrail: Integrates with persona_lifestyle_filter (Redis 10-Day & Vector 2-Day checks).
+- Step-by-Step Payload Storage: Saves the extracted idea context to temp/step1_reddit_context.json.
+- Courtesy Delay: 1.5s sleep buffer between community scans to prevent HTTP 429 rate limits.
 """
 
 import os
 import re
 import sys
 import time
-import base64
+import html
+import json
 import requests
-from io import BytesIO
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from PIL import Image
 from dotenv import load_dotenv
 
 # Setup Project Root Path
@@ -38,217 +38,258 @@ else:
 
 TEMP_DIR = PROJECT_ROOT / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
+STEP1_OUTPUT_FILE = TEMP_DIR / "step1_reddit_context.json"
 
-# Import Penapis Dwi-Lapisan
+# Import Penapis Dwi-Lapisan Redis & Vector
 from src.persona_lifestyle_filter import is_lifestyle_topic_duplicate
 
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+DEFAULT_SUBREDDITS = [
+    "MalaysianFood", "houseplants", "organization", "DIY",
+    "food", "IndoorGarden", "CozyPlaces", "Frugal", "Baking"
+]
+
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1"
+}
+
+RSS_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+    "Accept": "application/atom+xml,application/xml,text/xml;q=0.9,*/*;q=0.8"
+}
 
 
-def clean_reddit_text(text: str) -> str:
+def clean_reddit_text(raw_text: str, max_chars: int = 600) -> str:
     """
-    Membersihkan markdown, pautan luar, dan aksara pelik daripada teks Reddit.
+    Membersihkan tag HTML, pautan markdown, spoiler, dan simbol asing daripada teks Reddit.
     """
-    if not text:
+    if not raw_text:
         return ""
-    # Buang URL markdown [text](http://...)
-    cleaned = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
-    # Buang URL langsung
-    cleaned = re.sub(r"https?://\S+", "", cleaned)
-    # Buang tag spoiler dan format reddit
-    cleaned = re.sub(r">!|!<|#|\*|_|~", "", cleaned)
-    # Buang aksara bukan Latin/standard
-    cleaned = re.sub(r"[^\x00-\x7F]+", " ", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    text = html.unescape(raw_text)
+
+    # Buang tag HTML
+    text = re.sub(r'<[^>]+>', ' ', text)
+
+    if text.strip() in ["[removed]", "[deleted]"]:
+        return ""
+
+    # Buang spoiler markdown, link markdown [text](http...), dan URL langsung
+    text = re.sub(r'>!([\s\S]*?)!<', r'\1', text)
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    text = re.sub(r'https?://\S+', '', text)
+    text = re.sub(r'(?i)\n+\s*(?:edit|update|tldr|tl;dr|ps)[\s\S]*$', '', text)
+    text = re.sub(r'[*_~`#]', '', text)
+
+    # Buang simbol bukan Latin standard
+    text = re.sub(r'[^\x00-\x7F]+', ' ', text)
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    cleaned = " ".join(lines).strip()
+
+    if len(cleaned) > max_chars:
+        trimmed = cleaned[:max_chars]
+        last_punct = max(trimmed.rfind('.'), trimmed.rfind('!'), trimmed.rfind('?'))
+        if last_punct > 100:
+            cleaned = trimmed[:last_punct + 1].strip()
+        else:
+            cleaned = trimmed.rsplit(' ', 1)[0].strip() + "..."
+
     return cleaned
 
 
-def compress_image_to_under_50kb(
-    input_source: Any,
-    output_path: Path,
-    max_kb: int = 50
-) -> Tuple[bool, str, int]:
-    """
-    Memampatkan imej kepada resolusi optimum dan saiz di bawah 50KB.
-    """
+# =============================================================================
+# ENJIN 1: PENGAMBILAN TEKS VIA JSON API
+# =============================================================================
+def fetch_via_json(subreddit: str, limit: int = 25) -> Tuple[bool, List[Dict[str, Any]], str]:
+    """Menarik senarai pos teks daripada endpoint JSON rasmi Reddit."""
+    clean_sub = subreddit.replace("r/", "").strip()
+    endpoint = f"https://www.reddit.com/r/{clean_sub}/hot.json?limit={limit}&raw_json=1"
+
     try:
-        if isinstance(input_source, (str, Path)):
-            img = Image.open(input_source)
-        else:
-            img = Image.open(BytesIO(input_source))
+        res = requests.get(endpoint, headers=BROWSER_HEADERS, timeout=10)
+        if res.status_code != 200:
+            return False, [], f"JSON HTTP {res.status_code}"
 
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
+        data = res.json().get("data", {}).get("children", [])
+        if not data:
+            return False, [], "JSON tiada senarai pos."
 
-        # Hadkan dimensi maksimum 480px untuk menjimatkan token visual AI
-        img.thumbnail((480, 480), Image.Resampling.LANCZOS)
+        candidates = []
+        for child in data:
+            p = child.get("data", {})
+            if p.get("stickied") or p.get("over_18"):
+                continue
 
-        quality = 80
-        final_size_kb = 0
-        while quality >= 20:
-            buffer = BytesIO()
-            img.save(buffer, format="JPEG", quality=quality, optimize=True)
-            size_kb = len(buffer.getvalue()) / 1024.0
+            raw_title = p.get("title", "").strip()
+            raw_selftext = p.get("selftext", "").strip()
+            post_id = p.get("id", "")
+            if not raw_title or not post_id:
+                continue
 
-            if size_kb <= max_kb or quality <= 20:
-                with open(output_path, "wb") as f_out:
-                    f_out.write(buffer.getvalue())
-                final_size_kb = int(size_kb)
-                break
+            clean_t = clean_reddit_text(raw_title, max_chars=140)
+            clean_desc = clean_reddit_text(raw_selftext, max_chars=500)
 
-            quality -= 10
-            if quality < 50:
-                img.thumbnail((int(img.width * 0.85), int(img.height * 0.85)), Image.Resampling.LANCZOS)
+            candidates.append({
+                "post_id": post_id,
+                "subreddit": clean_sub,
+                "title": clean_t,
+                "description": clean_desc if clean_desc else clean_t,
+                "permalink": f"https://www.reddit.com{p.get('permalink', '')}",
+                "author": p.get("author", "Community Member"),
+                "score": p.get("score", 0),
+                "source_engine": "JSON_API"
+            })
 
-        return True, str(output_path), final_size_kb
+        return True, candidates, f"JSON: {len(candidates)} pos teks diterima."
     except Exception as e:
-        print(f"⚠️ [IMG COMPRESS ERROR] {e}")
-        return False, "", 0
+        return False, [], f"JSON Error: {e}"
 
 
-def extract_media_urls_from_reddit_post(post_data: Dict[str, Any]) -> List[str]:
-    """
-    Mengekstrak sehingga 4 URL imej statik daripada pos Reddit (tunggal atau galeri).
-    """
-    image_urls = []
-    
-    # 1. Semak pos galeri (media_metadata)
-    media_metadata = post_data.get("media_metadata", {})
-    gallery_data = post_data.get("gallery_data", {}).get("items", [])
-    
-    if media_metadata and gallery_data:
-        for item in gallery_data[:4]:
-            media_id = item.get("media_id")
-            m_info = media_metadata.get(media_id, {})
-            # Ambil URL resolusi tertinggi yang sedia ada
-            s_info = m_info.get("s", {})
-            raw_url = s_info.get("u") or s_info.get("gif")
-            if raw_url:
-                clean_url = raw_url.replace("&amp;", "&")
-                image_urls.append(clean_url)
-        if image_urls:
-            return image_urls
+# =============================================================================
+# ENJIN 2: PENGAMBILAN TEKS VIA RSS ATOM XML (SANDARAN KEBAL HTTP 403)
+# =============================================================================
+def fetch_via_rss(subreddit: str) -> Tuple[bool, List[Dict[str, Any]], str]:
+    """Menarik teks pos melalui suapan RSS Atom XML (kebal sekatan 403)."""
+    clean_sub = subreddit.replace("r/", "").strip()
+    endpoint = f"https://www.reddit.com/r/{clean_sub}/hot.rss"
 
-    # 2. Semak URL langsung (url_overridden_by_dest / url)
-    direct_url = post_data.get("url_overridden_by_dest") or post_data.get("url", "")
-    if any(direct_url.lower().endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp"]):
-        image_urls.append(direct_url)
-        return image_urls
+    try:
+        res = requests.get(endpoint, headers=RSS_HEADERS, timeout=12)
+        if res.status_code != 200:
+            return False, [], f"RSS HTTP {res.status_code}"
 
-    # 3. Semak preview images
-    preview_images = post_data.get("preview", {}).get("images", [])
-    if preview_images:
-        source_url = preview_images[0].get("source", {}).get("url", "")
-        if source_url:
-            image_urls.append(source_url.replace("&amp;", "&"))
+        root = ET.fromstring(res.content)
+        ns = {'atom': 'http://www.w3.org/2005/Atom'}
+        entries = root.findall('atom:entry', ns)
+        if not entries:
+            return False, [], "RSS tiada entri ditemui."
 
-    return image_urls[:4]
+        candidates = []
+        for index, entry in enumerate(entries):
+            title_elem = entry.find('atom:title', ns)
+            link_elem = entry.find('atom:link', ns)
+            content_elem = entry.find('atom:content', ns)
+            author_elem = entry.find('atom:author/atom:name', ns)
+            id_elem = entry.find('atom:id', ns)
 
+            title = title_elem.text.strip() if title_elem is not None and title_elem.text else ""
+            permalink = link_elem.attrib.get('href', '') if link_elem is not None else ""
+            raw_html = content_elem.text if content_elem is not None and content_elem.text else ""
+            author = author_elem.text.replace("/u/", "") if author_elem is not None and author_elem.text else "Community Member"
+            post_id = id_elem.text.split("_")[-1] if id_elem is not None and id_elem.text else f"rss_{index}"
 
-def fetch_curated_reddit_post(
-    subreddits: List[str],
-    require_image: bool = False
-) -> Optional[Dict[str, Any]]:
-    """
-    Mengimbas subreddit terpilih, menapis pos yang belum pernah digunakan,
-    dan memulangkan satu pos yang bersih serta sah untuk dijadikan inspirasi AI.
-    """
-    headers = {"User-Agent": USER_AGENT}
-
-    for sub in subreddits:
-        endpoint = f"https://www.reddit.com/r/{sub}/hot.json?limit=25"
-        print(f"📡 [REDDIT READER] Menyemak komuniti: r/{sub}...")
-
-        try:
-            res = requests.get(endpoint, headers=headers, timeout=12)
-            if res.status_code != 200:
-                print(f"⚠️ [REDDIT HTTP {res.status_code}] r/{sub}: {res.text[:80]}")
+            if not title or author in ["[deleted]", "AutoModerator"]:
                 continue
 
-            data = res.json().get("data", {}).get("children", [])
-            if not data:
+            clean_t = clean_reddit_text(title, max_chars=140)
+            clean_desc = clean_reddit_text(raw_html, max_chars=500)
+
+            candidates.append({
+                "post_id": post_id,
+                "subreddit": clean_sub,
+                "title": clean_t,
+                "description": clean_desc if clean_desc else clean_t,
+                "permalink": permalink,
+                "author": author,
+                "score": 50,
+                "source_engine": "RSS_ATOM_FEED"
+            })
+
+        return True, candidates, f"RSS: {len(candidates)} pos teks diekstrak."
+    except Exception as e:
+        return False, [], f"RSS Error: {e}"
+
+
+# =============================================================================
+# ENJIN PENGURUS UTAMA IDEA TEKS REDDIT (STEP 1)
+# =============================================================================
+def fetch_curated_reddit_post(subreddits: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+    """
+    Mengimbas subreddit sasaran menggunakan dwi-enjin (JSON -> RSS Fallback),
+    menapis pendua melalui Redis/Vector, dan menyimpan idea ke temp/step1_reddit_context.json.
+    """
+    target_subs = subreddits if subreddits else DEFAULT_SUBREDDITS
+
+    for sub_idx, sub in enumerate(target_subs):
+        print(f"📡 [REDDIT READER] Mengimbas idea teks komuniti: r/{sub}...")
+
+        # 1. Cuba JSON API dahulu
+        ok, candidates, msg = fetch_via_json(sub)
+        if not ok or not candidates:
+            print(f"  ⚠️ [{msg}] Beralih ke sandaran RSS Atom XML...")
+            # 2. Fallback kepada RSS XML jika JSON gagal / disekat
+            ok_rss, candidates_rss, msg_rss = fetch_via_rss(sub)
+            if ok_rss and candidates_rss:
+                candidates = candidates_rss
+                print(f"  ✅ [RSS FEED AKTIF] {msg_rss}")
+            else:
+                print(f"  ⚠️ [RSS GAGAL]: {msg_rss}")
+                time.sleep(1.5)
                 continue
 
-            for child in data:
-                p = child.get("data", {})
-                # Tapis pos moderator, NSFW atau stickied
-                if p.get("stickied") or p.get("over_18") or p.get("is_video"):
-                    continue
+        # 3. Tapis calon pos teks menggunakan penapis dwi-lapisan
+        for item in candidates:
+            clean_t = item.get("title", "")
+            clean_desc = item.get("description", "")
+            post_id = item.get("post_id", "")
 
-                raw_title = p.get("title", "").strip()
-                raw_selftext = p.get("selftext", "").strip()
-                post_id = p.get("id", "")
+            # Semak Penapis Dwi-Lapisan (Redis 10 Hari & Vector 2 Hari)
+            full_text_for_check = f"{clean_t} {clean_desc[:120]}"
+            is_dup, dup_reason = is_lifestyle_topic_duplicate(full_text_for_check)
+            if is_dup:
+                continue
 
-                # Semak penapis pendua Redis & Vector
-                full_text_for_check = f"{raw_title} {raw_selftext[:100]}"
-                is_dup, _ = is_lifestyle_topic_duplicate(full_text_for_check)
-                if is_dup:
-                    continue
+            result_payload = {
+                "source_platform": "reddit",
+                "source_engine": item["source_engine"],
+                "subreddit": sub,
+                "post_id": post_id,
+                "title": clean_t,
+                "description": clean_desc,
+                "permalink": item.get("permalink", f"https://reddit.com/r/{sub}"),
+                "author": item.get("author", "Community Member"),
+                "score": item.get("score", 0),
+                "curated_at": int(time.time())
+            }
 
-                image_urls = extract_media_urls_from_reddit_post(p)
+            # Simpan status sementara ke temp/step1_reddit_context.json
+            try:
+                with open(STEP1_OUTPUT_FILE, "w", encoding="utf-8") as f_out:
+                    json.dump(result_payload, f_out, indent=2, ensure_ascii=False)
+                print(f"💾 [STEP 1 PAYLOAD] Idea topik disimpan ke: {STEP1_OUTPUT_FILE.name}")
+            except Exception as e:
+                print(f"⚠️ [STEP 1 WARN] Gagal menyimpan {STEP1_OUTPUT_FILE.name}: {e}")
 
-                # Jika mod memerlukan imej tetapi pos tiada imej, langkau
-                if require_image and not image_urls:
-                    continue
+            print(f"🎯 [REDDIT IDEA WINNER] r/{sub} | ID: {post_id} ({item['source_engine']}) | Tajuk: '{clean_t[:45]}...'")
+            return result_payload
 
-                clean_t = clean_reddit_text(raw_title)
-                clean_desc = clean_reddit_text(raw_selftext)[:400]
+        # Jeda 1.5 saat antara komuniti bagi mengelakkan ralat HTTP 429
+        time.sleep(1.5)
 
-                # Muat turun dan mampatkan imej (maksimum 4 imej < 50KB)
-                local_images = []
-                for idx, img_url in enumerate(image_urls, 1):
-                    try:
-                        img_res = requests.get(img_url, headers=headers, timeout=15)
-                        if img_res.status_code == 200 and len(img_res.content) > 1000:
-                            out_p = TEMP_DIR / f"reddit_{post_id}_{idx}.jpg"
-                            comp_ok, comp_path, comp_kb = compress_image_to_under_50kb(img_res.content, out_p, max_kb=50)
-                            if comp_ok:
-                                local_images.append({
-                                    "local_path": comp_path,
-                                    "size_kb": comp_kb,
-                                    "original_url": img_url
-                                })
-                    except Exception as e:
-                        print(f"⚠️ [IMG DOWNLOAD ERROR] {e}")
-
-                if require_image and not local_images:
-                    continue
-
-                print(f"🎯 [REDDIT FOUND] r/{sub} | ID: {post_id} | Imej: {len(local_images)} fail")
-                return {
-                    "source_platform": "reddit",
-                    "subreddit": sub,
-                    "post_id": post_id,
-                    "title": clean_t,
-                    "description": clean_desc,
-                    "permalink": f"https://reddit.com{p.get('permalink', '')}",
-                    "local_images": local_images,
-                    "image_count": len(local_images),
-                    "author": p.get("author", "Community Member")
-                }
-
-        except Exception as e:
-            print(f"⚠️ [REDDIT FETCH ERROR] r/{sub}: {e}")
-
+    print("⚠️ [REDDIT READER] Tiada pos teks baharu yang melepasi tapisan dedup.")
     return None
 
 
 if __name__ == "__main__":
     print("=" * 70)
-    print("🧪 [TEST] Menguji Enjin Pembaca & Pemampat Reddit (Maksimum 4 Imej < 50KB)...")
+    print("🧪 [TEST] Menguji Pembaca Teks & Idea Reddit (Sifar Gambar Reddit)...")
     print("=" * 70)
 
-    test_subs = ["houseplants", "MalaysianFood", "DIY"]
-    post_result = fetch_curated_reddit_post(test_subs, require_image=True)
+    test_subs = ["MalaysianFood", "houseplants", "organization", "DIY"]
+    post_result = fetch_curated_reddit_post(test_subs)
 
     if post_result:
-        print("\n✅ POS REDDIT BERJAYA DIPEROLEHI:")
-        print(f"Subreddit : r/{post_result['subreddit']}")
+        print("\n✅ IDEA TEKS REDDIT BERJAYA DIPEROLEHI:")
+        print(f"Subreddit : r/{post_result['subreddit']} ({post_result['source_engine']})")
         print(f"Tajuk     : {post_result['title']}")
         print(f"Deskripsi : {post_result['description'][:150]}...")
-        print(f"Bil Imej  : {post_result['image_count']} fail sedia di temp/")
-        for img in post_result["local_images"]:
-            print(f"  • {Path(img['local_path']).name} ({img['size_kb']} KB)")
+        print(f"Fail JSON : {STEP1_OUTPUT_FILE}")
     else:
-        print("\n❌ Tiada pos sesuai dijumpai.")
+        print("\n❌ Tiada idea teks yang sesuai dijumpai.")
     print("=" * 70)

@@ -5,13 +5,11 @@ Location: bin/run_persona_lifestyle_master_runner.py
 
 Pipeline Sequence:
 - Step 0: Pre-Flight Environment & Secret Check (IRCM_* Priority)
-- Step 1: Prepare Context, Mood & Curate Topic (Plain Text or Reddit Curated)
-- Step 2: AI Multi-Platform Copywriting Generation (FB, IG, Threads, Bluesky)
-- Step 3: Interactive Mode Selection:
-  * [1] LIVE POST  - Posts to real Facebook, Instagram, Threads, and Bluesky accounts.
-  * [2] DRY RUN    - Simulation mode (Does not touch social media or lock DB keys).
-- Step 4: Telegram Summary Card & Audit Report
-- Step 5: Database Locking (Redis 10-Day, Vector 2-Day) & Cleanup (If Live Post)
+- Step 1: Prepare Context & Reddit Topic Idea
+- Step 3: Unsplash 40-Pool Visual Ingestion & Anti-Face Filter
+- Step 2 & 4: AI Multi-Platform Copywriting Generation (FB, IG, Threads, Bluesky)
+- Step 5: Interactive Mode Selection (LIVE POST vs DRY RUN)
+- Step 6: Telegram Summary Card & Database Lock (Redis 10-Day, Vector 2-Day)
 """
 
 import os
@@ -44,7 +42,6 @@ from src.persona_lifestyle_filter import commit_lifestyle_topic_lock
 TEMP_DIR = PROJECT_ROOT / "temp"
 PAYLOAD_FILE = TEMP_DIR / "lifestyle_payload.json"
 
-# ANSI Colors
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
 RED = "\033[91m"
@@ -137,12 +134,12 @@ def cleanup_temp_image(local_image_path: str = ""):
 def run_master_lifestyle_diagnostic():
     start_total_time = time.time()
     print("=" * 78)
-    print("🧪 [MASTER DIAGNOSTIC RUNNER] PERSONA LIFESTYLE MAMA (WITH DRY-RUN OPTION)")
+    print("🧪 [MASTER DIAGNOSTIC RUNNER] PERSONA LIFESTYLE MAMA (UNSPLASH & MODULAR PIPELINE)")
     print("   Impian Rumahku & Cerita Mama Ecosystem")
     print("=" * 78)
 
     parser = argparse.ArgumentParser(description="Master Diagnostic: Lifestyle Mama Runner")
-    parser.add_argument("--reddit", action="store_true", help="Aktifkan sumber inspirasi Reddit bergambar.")
+    parser.add_argument("--reddit", action="store_true", help="Aktifkan sumber teks Reddit & Unsplash Visual.")
     parser.add_argument("--niche", type=str, default=None, help="Paksa niche tertentu.")
     args = parser.parse_args()
 
@@ -155,7 +152,7 @@ def run_master_lifestyle_diagnostic():
         sys.exit(1)
 
     # =========================================================================
-    # STEP 1: PERSEDIAAN KONTEKS & PENAPISAN TOPIK
+    # STEP 1: PERSEDIAAN KONTEKS, REDDIT & UNSPLASH
     # =========================================================================
     print_step_header(1, "Persediaan Konteks, Mood & Saringan Topik")
     payload = run_lifestyle_prepare_step(use_reddit=args.reddit, force_niche=args.niche)
@@ -164,9 +161,9 @@ def run_master_lifestyle_diagnostic():
         return
 
     # =========================================================================
-    # STEP 2: PENJANAAN AYAT 4 PLATFORM OLEH AI
+    # STEP 2 & 4: PENJANAAN AYAT 4 PLATFORM OLEH AI
     # =========================================================================
-    print_step_header(2, "Penjanaan Ayat Persona Mama (Local VLM / OpenRouter Fallback)")
+    print_step_header(2, "Penjanaan Ayat Persona Mama (GGUF / OpenRouter Primary-First)")
     gen_ok = run_lifestyle_generate_step()
     if not gen_ok:
         print(f"{RED}❌ [ABORT] Gagal menjana ayat AI.{RESET}")
@@ -183,7 +180,7 @@ def run_master_lifestyle_diagnostic():
     niche_key = payload.get("niche", {}).get("niche_key", "lifestyle")
 
     # =========================================================================
-    # STEP 3: PILIHAN INTERAKTIF (LIVE POST VS DRY RUN)
+    # STEP 5: PILIHAN INTERAKTIF (LIVE POST VS DRY RUN)
     # =========================================================================
     print_step_header(3, "Pilihan Mod Pengedaran Media Sosial")
     print("PILIHAN MOD PENGUJIAN PENGEDARAN:")
@@ -212,20 +209,19 @@ def run_master_lifestyle_diagnostic():
             "bluesky": {"status": "success", "uri": f"at://did:plc:sim/app.bsky.feed.post/{topic_id}", "type": "dry_run"},
         }
 
-    # Kemas kini post_results ke state payload
     payload["post_results"] = post_results
     with open(PAYLOAD_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
     # =========================================================================
-    # STEP 4: LAPORAN RINGKASAN AUDIT TELEGRAM
+    # STEP 6: LAPORAN RINGKASAN AUDIT TELEGRAM
     # =========================================================================
     print_step_header(4, "Penghantaran Kad Ringkasan & Audit Telegram")
     audit_ok, audit_msg = send_lifestyle_telegram_audit_report(payload)
     print(f"📊 Status Telegram Audit: {'✅ Berjaya Dihantar' if audit_ok else '⚠️ ' + audit_msg}")
 
     # =========================================================================
-    # STEP 5: TRANSAKSI PANGKALAN DATA & PEMBERSIHAN FAIL
+    # STEP 7: TRANSAKSI PANGKALAN DATA & PEMBERSIHAN FAIL
     # =========================================================================
     print_step_header(5, "Penguncian Pangkalan Data & Pembersihan Fail Sementara")
 
@@ -241,12 +237,8 @@ def run_master_lifestyle_diagnostic():
         print("⚪ [DRY RUN / SKIPPED] Status pangkalan data (Redis & Vector) TIDAK dikunci.")
         print("ℹ️  Topik ini kekal bebas dan sedia digunakan pada masa hadapan.")
 
-    # Pembersihan fail imej tempatan
     cleanup_temp_image(local_image_path)
 
-    # =========================================================================
-    # RINGKASAN AKHIR KEPUTUSAN
-    # =========================================================================
     elapsed = time.time() - start_total_time
     print("\n" + "═" * 78)
     print(f"{BOLD}{GREEN}📊 LAPORAN DIAGNOSTIK LIFESTYLE SELESAI ({elapsed:.2f}s){RESET}")

@@ -1,131 +1,123 @@
 #!/usr/bin/env python3
 """
-Persona Lifestyle Mama: Step 1 Runner (Context, Topic Curation & Payload Preparation)
+Persona Lifestyle Mama: Step 1 Context, Reddit Topic & Step 3 Unsplash Preparator
 Location: bin/run_persona_lifestyle_prepare.py
-
-Usage:
-  python bin/run_persona_lifestyle_prepare.py                 # Mod Harian Santai (Teks Tulen)
-  python bin/run_persona_lifestyle_prepare.py --reddit        # Mod Reddit Curated (Dengan Gambar)
-  python bin/run_persona_lifestyle_prepare.py --niche makanan # Paksa Niche Tertentu
 """
 
+import os
 import sys
 import json
 import time
-import argparse
 from pathlib import Path
 from typing import Any, Dict, Optional
+from dotenv import load_dotenv
 
 # Setup Project Root Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Import Enjin Teras src/
-from src.persona_lifestyle_context import build_lifestyle_context_payload
-from src.persona_lifestyle_reddit_reader import fetch_curated_reddit_post
-from src.persona_lifestyle_filter import is_lifestyle_topic_duplicate
+# Load Environment Variables (.env.local priority)
+env_local = PROJECT_ROOT / ".env.local"
+if env_local.exists():
+    load_dotenv(dotenv_path=env_local)
+else:
+    load_dotenv()
 
 TEMP_DIR = PROJECT_ROOT / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 PAYLOAD_FILE = TEMP_DIR / "lifestyle_payload.json"
+
+# Import Context, Reddit Reader & Unsplash Engine
+from src.persona_lifestyle_context import build_lifestyle_context_payload
+from src.persona_lifestyle_reddit_reader import fetch_curated_reddit_post
+from src.persona_lifestyle_image_engine import select_and_curate_unsplash_image
+from src.persona_lifestyle_filter import is_lifestyle_topic_duplicate
 
 
 def run_lifestyle_prepare_step(
     use_reddit: bool = False,
     force_niche: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
-    print("\n" + "=" * 78)
-    print("🚀 [STEP 1] PERSEDIAAN KONTEKS, MOOD & PENAPISAN TOPIK LIFESTYLE MAMA")
+    """
+    Menyelaraskan penyediaan konteks, penapisan teks Reddit, dan visual Unsplash.
+    """
+    print("=" * 78)
+    print("🚀 [STEP 1 & 3] PERSEDIAAN KONTEKS, IDEA REDDIT & VISUAL UNSPLASH MAMA")
     print("=" * 78)
 
-    # 1. Bina Konteks Asas (Masa MYT, Mood 7 Hari, 7 Niche, Memori Redis)
-    context = build_lifestyle_context_payload(force_niche=force_niche)
-    dt_info = context["datetime"]
-    mood_info = context["mood"]
-    niche_info = context["niche"]
+    base_context = build_lifestyle_context_payload(force_niche=force_niche)
+    dt = base_context["datetime"]
+    mood = base_context["mood"]
+    niche = base_context["niche"]
 
-    print(f"🕒 Waktu Semasa   : {dt_info['formatted_full']} ({dt_info['period']})")
-    print(f"🎭 Mood Persona   : {mood_info['mood_name']}")
-    print(f"🌿 Niche Terpilih : {niche_info['niche_title']}")
-    print(f"💡 Memori Topik   : {len(context['recent_memories'])} topik terdahulu disuntik.")
+    print(f"🕒 Waktu Semasa   : {dt['formatted_full']} ({dt['period']})")
+    print(f"🎭 Mood Persona   : {mood['mood_name']}")
+    print(f"🌿 Niche Terpilih : {niche['niche_title']}")
+    print(f"💡 Memori Topik   : {len(base_context.get('recent_memories', []))} topik terdahulu disuntik.\n")
 
-    reddit_source = {}
-    local_image_path = ""
-    topic_id = f"life_{int(time.time())}_{dt_info['day_index']}_{dt_info['hour']}"
-    topic_text_for_lock = f"{niche_info['niche_title']} - {niche_info['prompt_hook']}"
+    reddit_data = None
+    image_data = None
+    local_image_path = None
 
-    # 2. Ambil Pos Reddit Jika Mod Reddit Diaktifkan
+    # 1. Pengekstrakan Teks Reddit (Jika Mod Reddit Aktif)
     if use_reddit:
-        print(f"\n📡 [MOD REDDIT AKTIF] Mengimbas komuniti: {niche_info['suggested_subreddits']}...")
-        reddit_post = fetch_curated_reddit_post(
-            subreddits=niche_info["suggested_subreddits"],
-            require_image=True
-        )
+        suggested_subs = niche.get("suggested_subreddits", ["MalaysianFood", "houseplants", "DIY"])
+        print(f"📡 [MOD REDDIT AKTIF] Mengimbas idea teks komuniti: {suggested_subs}...")
+        reddit_data = fetch_curated_reddit_post(suggested_subs)
 
-        if reddit_post:
-            reddit_source = reddit_post
-            topic_text_for_lock = f"{reddit_post['title']} {reddit_post['description'][:80]}"
-            topic_id = f"reddit_{reddit_post['post_id']}_{int(time.time())}"
-            if reddit_post.get("local_images"):
-                local_image_path = reddit_post["local_images"][0]["local_path"]
-                print(f"🖼️ Imej Reddit Utama : {Path(local_image_path).name}")
-            print(f"✅ Topik Reddit Ditemui: \"{reddit_post['title'][:60]}...\"")
+        if reddit_data:
+            print(f"✅ [IDEA REDDIT DITERIMA]: '{reddit_data['title'][:60]}...'")
+            # 2. Ingestion Visual Unsplash Berdasarkan Idea Reddit (Langkah 3)
+            print("🎨 [UNSPLASH ENGINE] Memulakan penarikan visual 40-Pool & Anti-Face Filter...")
+            image_data = select_and_curate_unsplash_image()
+            if image_data:
+                local_image_path = image_data.get("local_path")
         else:
-            print("⚠️ Tiada pos Reddit dengan imej ditemui. Beralih ke mod penceritaan santai biasa.")
+            print("⚠️ Tiada pos Reddit baharu yang melepasi tapisan. Beralih ke mod penceritaan santai biasa.")
 
-    # 3. Semak Penapis Dwi-Lapisan (Redis 10 Hari & Vector 2 Hari)
-    print(f"\n🛡️ [PENAPIS DWI-LAPISAN] Menyemak keunikan topik...")
-    is_dup, dup_reason = is_lifestyle_topic_duplicate(topic_text_for_lock)
+    # 3. Tentukan Teks Kunci Topik & Semak Penapis Dwi-Lapisan
+    topic_lock_text = f"{niche['niche_title']} - {reddit_data.get('title', niche['prompt_hook'])}" if reddit_data else f"{niche['niche_title']} - {niche['prompt_hook']}"
+    
+    is_dup, dup_reason = is_lifestyle_topic_duplicate(topic_lock_text)
     if is_dup:
-        print(f"⚠️ [TOPIK PENDUA] {dup_reason}")
         print("🔄 Menyesuaikan variasi hook penceritaan alternatif...")
-        topic_text_for_lock = f"{topic_text_for_lock} variasi {dt_info['time_str']}"
+        topic_lock_text += f" (Variasi Waktu {dt['period']})"
+
+    topic_id = f"life_{int(time.time())}_{dt['day_index']}_{dt['hour']}"
 
     # 4. Bina Payload Penuh
-    payload = {
-        "step": 1,
+    full_payload = {
         "topic_id": topic_id,
-        "topic_lock_text": topic_text_for_lock,
-        "datetime": dt_info,
-        "mood": mood_info,
-        "niche": niche_info,
-        "recent_memories": context["recent_memories"],
-        "reddit_source": reddit_source,
+        "topic_lock_text": topic_lock_text,
+        "datetime": dt,
+        "mood": mood,
+        "niche": niche,
+        "recent_memories": base_context.get("recent_memories", []),
+        "reddit_source": reddit_data or {},
+        "unsplash_image": image_data or {},
         "local_image_path": local_image_path,
-        "engine_used": "PENDING",
-        "total_duration_sec": 0.0,
-        "ai_captions": {
-            "facebook": "",
-            "instagram": "",
-            "threads": "",
-            "bluesky": "",
-        },
-        "post_results": {
-            "facebook": {"status": "pending"},
-            "instagram": {"status": "pending"},
-            "threads": {"status": "pending"},
-            "bluesky": {"status": "pending"},
-        },
-        "created_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        "persona_profile": base_context["persona_profile"],
+        "created_at": int(time.time())
     }
 
-    # 5. Simpan ke fail state temp/lifestyle_payload.json
     try:
         with open(PAYLOAD_FILE, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2, ensure_ascii=False)
+            json.dump(full_payload, f, indent=2, ensure_ascii=False)
         print(f"\n💾 [PAYLOAD SIAP] Fail disimpan ke: {PAYLOAD_FILE.name}")
-        print("=" * 78 + "\n")
-        return payload
     except Exception as e:
-        print(f"\n❌ [RALAT SIMPAN PAYLOAD] {e}")
+        print(f"❌ [PAYLOAD SAVE ERROR] {e}")
         return None
+
+    print("=" * 78)
+    return full_payload
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Step 1 Runner: Lifestyle Mama Context & Topic Preparer")
-    parser.add_argument("--reddit", action="store_true", help="Aktifkan sumber inspirasi komuniti Reddit bergambar.")
-    parser.add_argument("--niche", type=str, default=None, help="Paksa niche tertentu (tanaman, makanan, diy, affiliate_santai, movie_drama, hal_semasa, santai_keluarga).")
+    import argparse
+    parser = argparse.ArgumentParser(description="Step 1 & 3: Lifestyle Preparator Runner")
+    parser.add_argument("--reddit", action="store_true", help="Aktifkan sumber teks Reddit & Unsplash Visual.")
+    parser.add_argument("--niche", type=str, default=None, help="Paksa niche tertentu.")
     args = parser.parse_args()
 
     run_lifestyle_prepare_step(use_reddit=args.reddit, force_niche=args.niche)

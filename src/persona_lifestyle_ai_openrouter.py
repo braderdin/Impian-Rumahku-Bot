@@ -2,11 +2,14 @@
 """
 Persona Lifestyle Mama: Dedicated OpenRouter Engine (Primary-First Sequential)
 Location: src/persona_lifestyle_ai_openrouter.py
+
 Features:
-- Prioritizes IRCM_MODEL_PRIMARY (or IRCM_MODEL_VISION if image exists).
-- Cascades to fallbacks ONLY when primary model fails.
-- Generates 1 high-quality master story per API call to avoid HTTP 429 rate limits.
-- High token budget (max_tokens=700) to prevent reasoning models from exhausting tokens on <think>.
+- Prioritizes IRCM_MODEL_VISION if a curated Unsplash image is present in temp/.
+- Prioritizes IRCM_MODEL_PRIMARY for pure text mode.
+- Fallback models (Vision fallback, Fallback 1, 2, 3) are ONLY called if the primary model fails.
+- High token budget (max_tokens=700) to ensure reasoning models have room for <think> without starving output text.
+- Strict socket connection timeout (5s connect, 25s read) to prevent hanging terminals.
+- Persona Guardrail: Enforces 'Mama' persona, scrubs Indonesian vocabulary, and enforces zero emoji.
 """
 
 import os
@@ -26,6 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Load Environment Variables (.env.local priority)
 env_local = PROJECT_ROOT / ".env.local"
 if env_local.exists():
     load_dotenv(dotenv_path=env_local)
@@ -34,7 +38,9 @@ else:
 
 
 def compress_image_to_b64_under_50kb(image_path: str, max_kb: int = 50) -> Optional[str]:
-    """Memampatkan imej ke bawah 50KB dan menukarkannya kepada Base64 data URL."""
+    """
+    Memampatkan imej ke bawah 50KB dan menukarkannya kepada Base64 data URL untuk VLM.
+    """
     if not image_path or not os.path.exists(image_path):
         return None
 
@@ -61,27 +67,34 @@ def compress_image_to_b64_under_50kb(image_path: str, max_kb: int = 50) -> Optio
                     img.thumbnail((int(img.width * 0.85), int(img.height * 0.85)), Image.Resampling.LANCZOS)
 
     except Exception as e:
-        print(f"⚠️ [OPENROUTER IMAGE WARN] {e}")
+        print(f"⚠️ [OPENROUTER IMAGE WARN] Gagal memproses Base64: {e}")
 
     return None
 
 
 def clean_openrouter_output(text: str) -> str:
-    """Membersihkan output teks OpenRouter dan menyingkirkan tag reasoning."""
+    """
+    Membersihkan output teks OpenRouter, membuang tag reasoning AI, dan menapis istilah asing.
+    """
     if not text:
         return ""
 
+    # Buang tag pemikiran AI dan blok markdown
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     cleaned = re.sub(r"(?i)here'?s\s+a\s+thinking\s+process[\s\S]*?\n\n", "", cleaned)
     cleaned = re.sub(r"```json\s*", "", cleaned)
     cleaned = re.sub(r"```\s*", "", cleaned)
 
+    # Kamus Penguatkuasaan Tona Mama & Penyingkiran Istilah Indonesia
     word_replacements = {
         r"\baku\b": "Mama",
         r"\bAku\b": "Mama",
         r"\bsaya\b": "Mama",
         r"\bSaya\b": "Mama",
+        r"\bkantoran\b": "pejabat",
+        r"\bcapek\b": "penat",
         r"\bkulkas\b": "peti sejuk",
+        r"\bberantakan\b": "berselerak",
         r"\babu-abu\b": "kelabu",
         r"\bkamar mandi\b": "bilik air",
         r"\buang\b": "duit",
@@ -103,6 +116,7 @@ def clean_openrouter_output(text: str) -> str:
     for pattern, rep in word_replacements.items():
         cleaned = re.sub(pattern, rep, cleaned)
 
+    # Buang simbol rosak & tanda petik aneh
     replacements = {
         "’": "'", "‘": "'", "“": '"', "”": '"',
         "—": "-", "–": "-", "…": "...", "\xa0": " ",
@@ -110,12 +124,14 @@ def clean_openrouter_output(text: str) -> str:
     for orig, rep in replacements.items():
         cleaned = cleaned.replace(orig, rep)
 
+    # Buang semua emoji Unicode sama sekali
     emoji_pattern = re.compile(
         "[\U00010000-\U0010ffff\uD800-\uDBFF\uDC00-\uDFFF\u2600-\u26FF\u2700-\u27BF]",
         flags=re.UNICODE,
     )
     cleaned = emoji_pattern.sub("", cleaned).strip().strip('"').strip("'")
 
+    # Buang tajuk atau header jika dijana oleh model
     lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
     if lines and (lines[0].lower().startswith("tajuk") or lines[0].lower().startswith("title") or lines[0].startswith("**")):
         lines.pop(0)
@@ -125,7 +141,9 @@ def clean_openrouter_output(text: str) -> str:
 
 
 def trim_to_sentence_boundary(text: str, max_chars: int) -> str:
-    """Memotong teks pada noktah ayat terakhir secara kemas."""
+    """
+    Memotong teks pada noktah ayat terakhir secara kemas (menghalang perkataan terpotong separuh).
+    """
     if len(text) <= max_chars:
         return text.strip()
 
@@ -142,7 +160,9 @@ def trim_to_sentence_boundary(text: str, max_chars: int) -> str:
 
 
 def validate_openrouter_text(text: str, min_chars: int = 250, max_chars: int = 500) -> Tuple[bool, str]:
-    """Semakan kualiti teks OpenRouter."""
+    """
+    Semakan kualiti teks janaan OpenRouter.
+    """
     if not text or len(text) < min_chars:
         return False, f"Teks terlalu pendek ({len(text)} aksara, minima {min_chars})."
     if len(text) > max_chars:
@@ -166,14 +186,18 @@ def validate_openrouter_text(text: str, min_chars: int = 250, max_chars: int = 5
 
 def get_openrouter_queue(has_image: bool = False) -> Tuple[str, str, List[Tuple[str, str]]]:
     """
-    Menyusun hierarki panggilan:
-    Memulangkan: (endpoint, api_key, [(model_name, role_label)])
+    Menyusun hierarki panggilan OpenRouter secara berurutan:
+    - Model Utama didahulukan (Vision jika ada imej, Primary jika teks sahaja)[cite: 18].
+    - Model Fallback hanya dimasukkan di belakang sebagai sandaran kecemasan[cite: 18].
+    Memulangkan: (endpoint, api_key, [(model_name, role_label)])[cite: 18]
     """
     base_url = os.getenv("IRCM_OPENROUTER_BASE_URL", "").strip()
     api_key = os.getenv("IRCM_OPENROUTER_API_KEY", "").strip()
     endpoint = base_url if base_url.endswith("/chat/completions") else f"{base_url.rstrip('/')}/chat/completions"
 
-    queue = []
+    queue: List[Tuple[str, str]] = []
+
+    # 1. Aliran Jika Ada Gambar Unsplash
     if has_image:
         m_vis = os.getenv("IRCM_MODEL_VISION", "").strip()
         m_vis_fb = os.getenv("IRCM_MODEL_VISION_FALLBACK_1", "").strip()
@@ -182,6 +206,7 @@ def get_openrouter_queue(has_image: bool = False) -> Tuple[str, str, List[Tuple[
         if m_vis_fb and m_vis_fb != m_vis:
             queue.append((m_vis_fb, "FALLBACK VISION 1"))
 
+    # 2. Aliran Teks Utama
     m_primary = os.getenv("IRCM_MODEL_PRIMARY", "").strip()
     m_fb1 = os.getenv("IRCM_MODEL_FALLBACK_1", "").strip()
     m_fb2 = os.getenv("IRCM_MODEL_FALLBACK_2", "").strip()
@@ -204,8 +229,8 @@ def generate_lifestyle_captions_openrouter(
     local_image_path: Optional[str] = None
 ) -> Tuple[Optional[Dict[str, str]], str]:
     """
-    Penjanaan teks menggunakan OpenRouter mengikut keutamaan Model Utama.
-    Memulangkan: (captions_dict, model_name_used)
+    Penjanaan teks menggunakan OpenRouter mengikut keutamaan Model Utama[cite: 18].
+    Memulangkan: (captions_dict, model_name_used)[cite: 18]
     """
     b64_img = compress_image_to_b64_under_50kb(local_image_path, max_kb=50) if local_image_path else None
     endpoint, api_key, models_queue = get_openrouter_queue(has_image=bool(b64_img))
@@ -230,8 +255,8 @@ def generate_lifestyle_captions_openrouter(
         "PANTANG LARANG KETAT:\n"
         "- WAJIB bahasakan diri sebagai 'Mama' (DILARANG guna perkataan 'aku' atau 'saya').\n"
         "- DILARANG meletakkan emoji atau simbol grafik sama sekali.\n"
-        "- DILARANG guna istilah Indonesia (kulkas, abu-abu, kamar mandi, uang, anda, banget, bisa, bikin, gampang, yuk, cobain).\n"
-        "- Gunakan perkataan Melayu: kelabu, bilik air, duit, korang, jimat ruang, kemas elok, senang guna, sedap mata memandang.\n"
+        "- DILARANG guna istilah Indonesia (kantoran, capek, kulkas, berantakan, abu-abu, kamar mandi, uang, anda, banget, bisa, bikin, gampang, yuk, cobain).\n"
+        "- Gunakan perkataan Melayu: pejabat, penat, peti sejuk, berselerak, kelabu, bilik air, duit, korang, jimat ruang, kemas elok, senang guna, sedap mata memandang.\n"
         "- DILARANG beritahu ini dihasilkan oleh AI. Tulis seperti manusia sebenar.\n"
         "- DILARANG letak link, hashtag, atau baris tajuk 'Tajuk:'. Terus mula bercerita."
     )
@@ -266,11 +291,12 @@ def generate_lifestyle_captions_openrouter(
                 {"role": "user", "content": user_content},
             ],
             "temperature": 0.40,
-            "max_tokens": 700  # Bajet token tinggi bagi mengelakkan <think> memakan ruang output
+            "max_tokens": 700  # Bajet token mencukupi bagi mengelakkan <think> memakan ruang output[cite: 18]
         }
 
         for attempt in range(1, 3):
             try:
+                # Had masa soket ketat (5s connect, 25s read)
                 res = requests.post(endpoint, headers=headers, json=payload, timeout=(5, 25))
                 if res.status_code == 200:
                     raw = res.json().get("choices", [{}])[0].get("message", {}).get("content", "")
@@ -288,6 +314,8 @@ def generate_lifestyle_captions_openrouter(
                         }, f"OPENROUTER ({model_name})"
                     else:
                         print(f"   ⚠️ [{role_label} Format Ditolak ({attempt}/2)]: {reason}")
+                elif res.status_code == 429:
+                    print(f"   ⚠️ [{role_label} HTTP 429 Sesak ({attempt}/2)]. Menunggu seketika...")
                 else:
                     print(f"   ⚠️ [{role_label} HTTP {res.status_code}] {res.text[:70]}")
             except requests.exceptions.Timeout:
@@ -300,3 +328,23 @@ def generate_lifestyle_captions_openrouter(
         print(f"   ⚠️ [{role_label} Gagal]. Beralih ke model seterusnya...")
 
     return None, "FAILED"
+
+
+if __name__ == "__main__":
+    print("=" * 70)
+    print("🧪 [TEST] Menguji Enjin Dedicated OpenRouter (Primary-First)...")
+    print("=" * 70)
+
+    from src.persona_lifestyle_context import build_lifestyle_context_payload
+
+    dummy_context = build_lifestyle_context_payload()
+    result_caps, model_used = generate_lifestyle_captions_openrouter(dummy_context)
+
+    if result_caps:
+        print(f"\n🚀 Berjaya Menggunakan Model: {model_used}\n")
+        for platform, text in result_caps.items():
+            print(f"📱 [{platform.upper()}] ({len(text)} aksara):")
+            print(f"\"{text}\"\n")
+    else:
+        print("\n❌ Gagal menjana melalui OpenRouter.")
+    print("=" * 70)

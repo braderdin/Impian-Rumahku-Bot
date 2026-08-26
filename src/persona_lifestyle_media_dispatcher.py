@@ -7,13 +7,16 @@ Features:
 - Facebook Page: Dispatches text or photo post via Graph API.
 - Instagram Feed: Dispatches photo post via signed B2 image bridge (or gracefully skips text-only).
 - Meta Threads: Reads active bearer token directly from Redis 'auth:impianrumahku:threads_token'.
-- Bluesky Feed: Dispatches text or image post via AT-Protocol with facet formatting.
+  * Integrates a mandatory 3-second sleep buffer between container creation & publishing to avoid HTTP 400.
+- Bluesky Feed: Dispatches text or image post via AT-Protocol with Blob API.
+- Ephemeral B2 Storage: Deletes temporary images from Backblaze B2 immediately after dispatch.
 - Isolated Error Handling: One platform failure does not block the others.
 """
 
 import os
 import sys
 import json
+import time
 import requests
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
@@ -31,7 +34,7 @@ if env_local.exists():
 else:
     load_dotenv()
 
-# Import Storan B2
+# Import Storan B2 Ephemeral
 from src.persona_lifestyle_b2_storage import upload_temp_image_to_b2_signed, delete_ephemeral_image_from_b2
 
 REDIS_THREADS_TOKEN_KEY = "auth:impianrumahku:threads_token"
@@ -49,7 +52,6 @@ def get_active_threads_token_from_redis() -> Tuple[Optional[str], Optional[str],
     redis_token = os.getenv("IRCM_UPSTASH_REDIS_REST_TOKEN", "").strip()
 
     if not redis_url or not redis_token:
-        # Fallback kepada env biasa jika Redis tiada
         env_token = os.getenv("IRCM_THREADS_ACCESS_TOKEN", "").strip()
         if env_token and user_id:
             return user_id, env_token, ""
@@ -68,7 +70,6 @@ def get_active_threads_token_from_redis() -> Tuple[Optional[str], Optional[str],
     except Exception as e:
         print(f"⚠️ [THREADS TOKEN REDIS WARN] {e}")
 
-    # Fallback env jika Redis kosong
     env_token = os.getenv("IRCM_THREADS_ACCESS_TOKEN", "").strip()
     if env_token and user_id:
         return user_id, env_token, ""
@@ -125,7 +126,6 @@ def dispatch_to_instagram(
     if not account_id or not access_token:
         return False, {}, "Kunci IRCM_INSTAGRAM_* tidak lengkap."
 
-    # Instagram Graph API memerlukan imej untuk membuat pos Feed
     if not signed_image_url:
         print("ℹ️ [INSTAGRAM] Tiada imej disertakan. Hantaran Instagram teks sahaja dilangkau secara selamat.")
         return True, {"status": "skipped", "reason": "text_only_no_image"}, "Instagram dilangkau (tiada imej)."
@@ -159,13 +159,13 @@ def dispatch_to_instagram(
 
 
 # =============================================================================
-# 4. PLATFORM 3: META THREADS FEED
+# 4. PLATFORM 3: META THREADS FEED (DENGAN JEDA 3 SAAT BUFFER)
 # =============================================================================
 def dispatch_to_threads(
     caption: str,
     signed_image_url: Optional[str] = None
 ) -> Tuple[bool, Dict[str, Any], str]:
-    """Menghantar teks atau imej ke Meta Threads API menggunakan token Redis."""
+    """Menghantar teks atau imej ke Meta Threads API dengan buffer 3 saat."""
     user_id, access_token, token_err = get_active_threads_token_from_redis()
     if token_err:
         return False, {}, token_err
@@ -192,6 +192,9 @@ def dispatch_to_threads(
             return False, {}, f"Threads Container HTTP {res_c.status_code}: {res_c.text}"
 
         creation_id = res_c.json().get("id")
+
+        # ⏳ Buffer 3 Saat: Memastikan kontena sedia di pelayan Meta sebelum diterbitkan
+        time.sleep(3)
 
         # 2. Terbitkan Container
         publish_url = f"https://graph.threads.net/v1.0/{user_id}/threads_publish"
@@ -249,7 +252,7 @@ def dispatch_to_bluesky(
                 blob_json = blob_res.json().get("blob")
                 embed_payload = {
                     "$type": "app.bsky.embed.images",
-                    "images": [{"alt": "Impian Rumahku Lifestyle", "image": blob_json}]
+                    "images": [{"alt": "Impian Rumahku Lifestyle Visual", "image": blob_json}]
                 }
 
         # 3. Create Record
@@ -295,10 +298,10 @@ def dispatch_lifestyle_to_all_platforms(
     if local_image_path and os.path.exists(local_image_path):
         b2_ok, signed_b2_url, b2_fid, b2_fname, b2_api, b2_tok, b2_err = upload_temp_image_to_b2_signed(local_image_path)
         if not b2_ok:
-            print(f"⚠️ [B2 WARN] {b2_err}")
+            print(f"⚠️ [B2 STORAGE WARN] {b2_err}")
 
     try:
-        # 1. Facebook Page
+        # 1. Facebook Page Feed
         fb_cap = captions.get("facebook", "")
         fb_ok, fb_info, fb_msg = dispatch_to_facebook(fb_cap, local_image_path)
         results["facebook"] = {"status": "success", **fb_info} if fb_ok else {"status": "failed", "error": fb_msg}
@@ -324,13 +327,3 @@ def dispatch_lifestyle_to_all_platforms(
             delete_ephemeral_image_from_b2(b2_api, b2_tok, b2_fid, b2_fname)
 
     return results
-
-
-if __name__ == "__main__":
-    print("=" * 70)
-    print("🧪 [TEST] Menguji Enjin Pengedar Media Sosial...")
-    print("=" * 70)
-
-    u_id, t_tok, t_err = get_active_threads_token_from_redis()
-    print(f"Semakan Token Threads Redis: {'✅ Sah' if not t_err else '⚠️ ' + t_err}")
-    print("=" * 70)

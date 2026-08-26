@@ -1,115 +1,123 @@
 #!/usr/bin/env python3
 """
-Persona Lifestyle Mama: Step 2 Runner (Multi-Platform AI Content Generator)
+Persona Lifestyle Mama: Step 2 & 4 AI Multi-Platform Copywriting Generator
 Location: bin/run_persona_lifestyle_generate.py
-
-Features:
-- Reads state context from temp/lifestyle_payload.json.
-- Dispatches prompt to local Qwen3.5-4B VLM/LLM with automatic OpenRouter cascading fallback.
-- Enforces strict character limits:
-  * Facebook  : 300 - 500 chars
-  * Instagram : 300 - 500 chars
-  * Threads   : 300 - 480 chars
-  * Bluesky   : 200 - 280 chars
-- Validates clean Latin alphabet, zero Indonesian slang, and zero emojis.
-- Updates and preserves payload in temp/lifestyle_payload.json.
 """
 
+import os
 import sys
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+from dotenv import load_dotenv
 
 # Setup Project Root Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Import Enjin AI Teras dari src/
-from src.persona_lifestyle_ai_engine import generate_all_lifestyle_captions
+# Load Environment Variables (.env.local priority)
+env_local = PROJECT_ROOT / ".env.local"
+if env_local.exists():
+    load_dotenv(dotenv_path=env_local)
+else:
+    load_dotenv()
 
 TEMP_DIR = PROJECT_ROOT / "temp"
 PAYLOAD_FILE = TEMP_DIR / "lifestyle_payload.json"
+STEP4_OUTPUT_FILE = TEMP_DIR / "step4_final_captions.json"
 
-
-def print_banner(text: str):
-    print("\n" + "═" * 78)
-    print(f"🧠 {text.upper()}")
-    print("═" * 78)
+# Import Router Modular AI
+from src.persona_lifestyle_ai_engine import generate_all_lifestyle_captions
 
 
 def run_lifestyle_generate_step() -> bool:
-    start_time = time.time()
-    print_banner("[STEP 2] PENJANAAN AYAT PERSONA MAMA MERENTASI 4 PLATFORM")
-
-    # 1. Semak kewujudan fail state Step 1
+    """
+    Membaca payload penyediaan, menjana kapsyen 4 platform oleh Persona Mama,
+    dan merekodkannya kembali ke dalam fail state JSON.
+    """
     if not PAYLOAD_FILE.exists():
-        print(f"❌ [ABORT] Fail payload '{PAYLOAD_FILE.name}' tidak ditemui. Sila jalankan Step 1 dahulu.")
-        sys.exit(1)
+        print(f"❌ [GENERATE ERROR] Fail {PAYLOAD_FILE.name} tidak dijumpai. Jalankan step prepare dahulu.")
+        return False
 
     try:
         with open(PAYLOAD_FILE, "r", encoding="utf-8") as f:
             payload = json.load(f)
     except Exception as e:
-        print(f"❌ [ABORT] Gagal membaca fail payload: {e}")
-        sys.exit(1)
+        print(f"❌ [GENERATE LOAD ERROR] Gagal membaca payload: {e}")
+        return False
 
-    dt_info = payload.get("datetime", {})
-    niche_info = payload.get("niche", {})
-    mood_info = payload.get("mood", {})
+    dt = payload.get("datetime", {})
+    mood = payload.get("mood", {})
+    niche = payload.get("niche", {})
     local_image = payload.get("local_image_path", "")
 
-    print(f"🕒 Waktu Siaran   : {dt_info.get('formatted_full', '')} ({dt_info.get('period', '')})")
-    print(f"🎭 Mood Terpilih  : {mood_info.get('mood_name', '')}")
-    print(f"🌿 Niche Kandungan: {niche_info.get('niche_title', '')}")
-    if local_image:
-        print(f"🖼️ Mod Visual     : Menggunakan imej '{Path(local_image).name}'")
-    else:
-        print(f"📝 Mod Visual     : Hantaran Teks Santai Sahaja (Tanpa Imej)")
+    print("═" * 78)
+    print("🧠 [STEP 4] PENJANAAN AYAT PERSONA MAMA MERENTASI 4 PLATFORM")
+    print("═" * 78)
+    print(f"🕒 Waktu Siaran   : {dt.get('formatted_full', '')} ({dt.get('period', '')})")
+    print(f"🎭 Mood Terpilih  : {mood.get('mood_name', '')}")
+    print(f"🌿 Niche Kandungan: {niche.get('niche_title', '')}")
+    print(f"📝 Mod Visual     : {'Gambar Unsplash Tersedia' if local_image else 'Hantaran Teks Santai Sahaja'}\n")
 
-    # 2. Panggil Enjin AI (Local Qwen3.5-4B -> OpenRouter Fallback -> Rule-Based)
-    print("\n⏳ Menjalankan inferens AI dwi-mod dengan kawalan had aksara...")
+    start_time = time.time()
     captions, engine_used = generate_all_lifestyle_captions(
         context_payload=payload,
         local_image_path=local_image if local_image else None
     )
+    duration = time.time() - start_time
 
-    elapsed = time.time() - start_time
+    if not captions:
+        print("❌ [GENERATE ERROR] Gagal menghasilkan ayat ulasan bagi semua platform.")
+        return False
 
-    # 3. Paparan Pratonton Lengkap 4 Platform
+    print("-" * 78)
+    print(f"📝 [HASIL JANAAN AI PERSONA MAMA] (Enjin: {engine_used} | Masa: {duration:.2f}s)")
+    print("-" * 78)
+
+    platform_meta = [
+        ("facebook", "📘 1. FACEBOOK FEED", 300, 500),
+        ("instagram", "📸 2. INSTAGRAM FEED", 300, 500),
+        ("threads", "🧵 3. META THREADS FEED", 300, 480),
+        ("bluesky", "🦋 4. BLUESKY FEED", 200, 280),
+    ]
+
+    for key, label, min_c, max_c in platform_meta:
+        txt = captions.get(key, "")
+        print(f"\n{label} ({len(txt)} aksara | Sasaran: {min_c}-{max_c}):")
+        print(f'"{txt}"')
+
     print("\n" + "-" * 78)
-    print(f"📝 [HASIL JANAAN AI PERSONA MAMA] (Enjin: {engine_used} | Masa: {elapsed:.2f}s)")
-    print("-" * 78)
 
-    print(f"\n📘 1. FACEBOOK FEED ({len(captions['facebook'])} aksara | Sasaran: 300-500):")
-    print(f"\"{captions['facebook']}\"")
+    # Simpan output step 4
+    step4_payload = {
+        "engine_used": engine_used,
+        "generation_time_seconds": round(duration, 2),
+        "ai_captions": captions
+    }
 
-    print(f"\n📸 2. INSTAGRAM FEED ({len(captions['instagram'])} aksara | Sasaran: 300-500):")
-    print(f"\"{captions['instagram']}\"")
+    try:
+        with open(STEP4_OUTPUT_FILE, "w", encoding="utf-8") as f_out:
+            json.dump(step4_payload, f_out, indent=2, ensure_ascii=False)
+        print(f"💾 [STEP 4 PAYLOAD] Kapsyen disimpan ke: {STEP4_OUTPUT_FILE.name}")
+    except Exception:
+        pass
 
-    print(f"\n🧵 3. META THREADS FEED ({len(captions['threads'])} aksara | Sasaran: 300-480):")
-    print(f"\"{captions['threads']}\"")
-
-    print(f"\n🦋 4. BLUESKY FEED ({len(captions['bluesky'])} aksara | Sasaran: 200-280):")
-    print(f"\"{captions['bluesky']}\"")
-    print("-" * 78)
-
-    # 4. Kemas kini State Payload
-    payload["step"] = 2
+    # Kemas kini state payload utama
     payload["ai_captions"] = captions
-    payload["engine_used"] = engine_used
-    payload["generation_duration_sec"] = round(elapsed, 2)
+    payload["ai_engine_used"] = engine_used
 
     try:
         with open(PAYLOAD_FILE, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
-        print(f"\n💾 [PAYLOAD UPDATED] Teks 4 platform berjaya direkodkan ke: {PAYLOAD_FILE.name}")
-        print_banner(f"STEP 2 SELESAI ({elapsed:.2f}S)")
-        return True
+        print(f"💾 [PAYLOAD UPDATED] Teks 4 platform direkodkan ke: {PAYLOAD_FILE.name}")
     except Exception as e:
-        print(f"❌ [PAYLOAD WRITE ERROR] {e}")
+        print(f"❌ [GENERATE SAVE ERROR] {e}")
         return False
+
+    print("═" * 78)
+    return True
 
 
 if __name__ == "__main__":
