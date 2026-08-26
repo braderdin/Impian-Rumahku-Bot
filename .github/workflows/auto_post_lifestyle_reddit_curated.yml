@@ -1,0 +1,83 @@
+name: Auto Post Persona Lifestyle (Reddit Curated - Visual AI)
+
+on:
+  schedule:
+    # 4:30 PM MYT (08:30 UTC), 10:30 PM MYT (14:30 UTC)
+    - cron: '30 8,14 * * *'
+  workflow_dispatch: # Manual trigger di GitHub Actions UI
+
+jobs:
+  post-lifestyle-reddit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - name: Checkout Kod Repositori
+        uses: actions/checkout@v7
+
+      - name: Pasang Persekitaran Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+
+      # 1. Pulihkan Cache Pip & Model Hugging Face Sedia Ada
+      - name: ⚡ Pulihkan Cache Bersatu (Pip & Hugging Face VLM)
+        id: pipeline-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-ircm-cache-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-ircm-cache-
+
+      # 2. Pasang Pustaka Python Menggunakan Cache Sedia Ada
+      - name: 📦 Pasang Pustaka Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 3. Jalankan Saluran Reddit Curated (Step 1 --reddit -> 2 -> 3 -> 4)
+      - name: 🚀 Jalankan Saluran Automasi Reddit Curated Persona Mama
+        env:
+          # OpenRouter Vision & Fallbacks
+          IRCM_OPENROUTER_BASE_URL: ${{ secrets.IRCM_OPENROUTER_BASE_URL }}
+          IRCM_OPENROUTER_API_KEY: ${{ secrets.IRCM_OPENROUTER_API_KEY }}
+          IRCM_MODEL_VISION: ${{ secrets.IRCM_MODEL_VISION }}
+          IRCM_MODEL_VISION_FALLBACK_1: ${{ secrets.IRCM_MODEL_VISION_FALLBACK_1 }}
+          IRCM_MODEL_PRIMARY: ${{ secrets.IRCM_MODEL_PRIMARY }}
+          IRCM_MODEL_FALLBACK_1: ${{ secrets.IRCM_MODEL_FALLBACK_1 }}
+          IRCM_MODEL_FALLBACK_2: ${{ secrets.IRCM_MODEL_FALLBACK_2 }}
+          IRCM_MODEL_FALLBACK_3: ${{ secrets.IRCM_MODEL_FALLBACK_3 }}
+          IRCM_MODEL_FALLBACK_4: ${{ secrets.IRCM_MODEL_FALLBACK_4 }}
+          
+          # Upstash Redis & Vector
+          IRCM_UPSTASH_REDIS_REST_URL: ${{ secrets.IRCM_UPSTASH_REDIS_REST_URL }}
+          IRCM_UPSTASH_REDIS_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_REDIS_REST_TOKEN }}
+          IRCM_UPSTASH_VECTOR_REST_URL: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_URL }}
+          IRCM_UPSTASH_VECTOR_REST_TOKEN: ${{ secrets.IRCM_UPSTASH_VECTOR_REST_TOKEN }}
+          
+          # Telegram Audit Bot
+          IRCM_TELEGRAM_BOT_TOKEN: ${{ secrets.IRCM_TELEGRAM_BOT_TOKEN }}
+          IRCM_TELEGRAM_CHAT_ID: ${{ secrets.IRCM_TELEGRAM_CHAT_ID }}
+          
+          # Social Media Protocols
+          IRCM_FB_META_PAGE_ID: ${{ secrets.IRCM_FB_META_PAGE_ID }}
+          IRCM_FB_META_PAGE_ACCESS_TOKEN: ${{ secrets.IRCM_FB_META_PAGE_ACCESS_TOKEN }}
+          IRCM_INSTAGRAM_ACCOUNT_ID: ${{ secrets.IRCM_INSTAGRAM_ACCOUNT_ID }}
+          IRCM_INSTAGRAM_ACCESS_TOKEN: ${{ secrets.IRCM_INSTAGRAM_ACCESS_TOKEN }}
+          IRCM_THREADS_USER_ID: ${{ secrets.IRCM_THREADS_USER_ID }}
+          IRCM_BLUESKY_HANDLE: ${{ secrets.IRCM_BLUESKY_HANDLE }}
+          IRCM_BLUESKY_APP_PASSWORD: ${{ secrets.IRCM_BLUESKY_APP_PASSWORD }}
+          
+          # Storage Bridge (Meta Ephemeral Media)
+          IRCM_B2_KEY_ID: ${{ secrets.IRCM_B2_KEY_ID }}
+          IRCM_B2_APPLICATION_KEY: ${{ secrets.IRCM_B2_APPLICATION_KEY }}
+          IRCM_B2_BUCKET_NAME: ${{ secrets.IRCM_B2_BUCKET_NAME }}
+          IRCM_B2_BUCKET_ID: ${{ secrets.IRCM_B2_BUCKET_ID }}
+        run: |
+          python bin/run_persona_lifestyle_prepare.py --reddit
+          python bin/run_persona_lifestyle_generate.py
+          python bin/run_persona_lifestyle_dispatch.py
+          python bin/run_persona_lifestyle_audit_and_commit.py
