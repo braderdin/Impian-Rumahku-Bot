@@ -1,0 +1,69 @@
+{
+  "step": 2,
+  "topic_id": "life_1787741611_2_18",
+  "topic_lock_text": "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat bahan dapur, cara perap lauk mudah, atau idea minum petang. variasi 06:53 PM",
+  "datetime": {
+    "timestamp": 1787741611,
+    "day_name": "Rabu",
+    "day_index": 2,
+    "date_str": "26 Ogos 2026",
+    "time_str": "06:53 PM",
+    "hour": 18,
+    "period": "Petang",
+    "period_context": "Waktu petang santai, siram pokok di laman atau sediakan minum petang untuk keluarga.",
+    "formatted_full": "Rabu, 26 Ogos 2026, 06:53 PM"
+  },
+  "mood": {
+    "mood_name": "Santai Pertengahan Minggu",
+    "tone_description": "Santai, bersahaja, berkongsi rasa lega bila kerja rumah selesai awal.",
+    "time_phase": "Petang"
+  },
+  "niche": {
+    "niche_key": "makanan",
+    "niche_title": "Makanan, Resepi Ringkas & Dapur Mama",
+    "prompt_hook": "Cerita aroma masakan harian, resepi jimat bahan dapur, cara perap lauk mudah, atau idea minum petang.",
+    "suggested_subreddits": [
+      "MalaysianFood",
+      "EatCheapAndHealthy"
+    ]
+  },
+  "recent_memories": [
+    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat",
+    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat",
+    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat",
+    "Makanan, Resepi Ringkas & Dapur Mama - Cerita aroma masakan harian, resepi jimat"
+  ],
+  "reddit_source": {},
+  "local_image_path": "",
+  "engine_used": "OPENROUTER (dots-studio/dots-3-note-preview:free)",
+  "total_duration_sec": 0.0,
+  "ai_captions": {
+    "facebook": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat. Cukup perah sedikit limau kapas, campur gula melaka yang dileburkan dengan air panas, kemudian tambah air sejuk dan ais batu. Aroma limau kapas yang segar tu memang buat hati tenang. Anak-anak pun senang minum ni, Mama boleh tambah sedikit daun pudina kalau nak rasa lebih segar.",
+    "instagram": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat. Cukup perah sedikit limau kapas, campur gula melaka yang dileburkan dengan air panas, kemudian tambah air sejuk dan ais batu. Aroma limau kapas yang segar tu memang buat hati tenang. Anak-anak pun senang minum ni, Mama boleh tambah sedikit daun pudina kalau nak rasa lebih segar.",
+    "threads": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat. Cukup perah sedikit limau kapas, campur gula melaka yang dileburkan dengan air panas, kemudian tambah air sejuk dan ais batu. Aroma limau kapas yang segar tu memang buat hati tenang. Anak-anak pun senang minum ni, Mama boleh tambah sedikit daun pudina kalau nak rasa lebih segar.",
+    "bluesky": "Hari Rabu ni, Mama suka sediakan minum petang yang menyejukkan selepas bersiar-siar di laman sambil siram pokok-pokok. Biasanya, Mama buat ais limau kapas yang mudah sangat."
+  },
+  "post_results": {
+    "facebook": {
+      "status": "success",
+      "post_id": "1353740547811893_122102159397450068",
+      "char_count": 453
+    },
+    "instagram": {
+      "status": "skipped",
+      "reason": "text_only_no_image"
+    },
+    "threads": {
+      "status": "success",
+      "thread_id": "18024668177692753",
+      "char_count": 453
+    },
+    "bluesky": {
+      "status": "success",
+      "uri": "at://did:plc:nrwxc2ntoi3fmj3ihzbgroge/app.bsky.feed.post/3mty6aln5wf2z",
+      "char_count": 173
+    }
+  },
+  "created_at": "2026-08-26 18:53:31",
+  "generation_duration_sec": 55.36
+}
