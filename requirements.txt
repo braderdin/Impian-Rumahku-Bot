@@ -32,7 +32,7 @@ tqdm>=4.70.0
 rich>=13.7.0
 python-dateutil>=2.9.0.post0
 decorator>=5.3.1
-proglog>=0.1.10
+proglog>=0.1.12
 
 # Local LLM GGUF Engine (Qwen 2.5 3B GGUF)
 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
