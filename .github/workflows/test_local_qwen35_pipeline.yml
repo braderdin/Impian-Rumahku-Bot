@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Checkout Kod Repositori
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Pasang Persekitaran Python 3.11
         uses: actions/setup-python@v5
