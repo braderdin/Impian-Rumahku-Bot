@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Checkout Kod Repositori
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 1. Tambah Swap Memory 10GB untuk menampung KV Cache 16K Q8 & Vision
       - name: 🛠️ Bina 10GB Swap Memory di Runner
