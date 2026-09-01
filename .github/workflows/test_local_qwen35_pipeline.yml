@@ -19,7 +19,7 @@ jobs:
 
       # Cache Model Qwen3.5-4B Q4_K_M (~2.74 GB) & mmproj-F16 (~672 MB)
       - name: Pulihkan / Simpan Cache Hugging Face GGUF & VLM
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/huggingface/hub
           key: ${{ runner.os }}-hf-qwen35-4b-q4km-v1
@@ -28,7 +28,7 @@ jobs:
 
       # Cache wheel & pakej pip
       - name: Pulihkan / Simpan Cache Pip
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-qwen35-test-${{ hashFiles('requirements.txt') }}

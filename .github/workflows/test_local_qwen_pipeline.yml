@@ -19,7 +19,7 @@ jobs:
 
       # Cache model GGUF dari Hugging Face (~2.1 GB) agar tidak dimuat turun berulang kali
       - name: Pulihkan / Simpan Cache Hugging Face GGUF
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/huggingface/hub
           key: ${{ runner.os }}-hf-qwen-3b-q5km-v1
@@ -28,7 +28,7 @@ jobs:
 
       # Cache wheel & package pip
       - name: Pulihkan / Simpan Cache Pip
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-qwen-test-${{ hashFiles('requirements.txt') }}

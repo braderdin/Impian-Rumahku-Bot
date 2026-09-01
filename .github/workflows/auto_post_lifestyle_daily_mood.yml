@@ -23,7 +23,7 @@ jobs:
       # 1. Pulihkan Cache Pip & Model Hugging Face Sedia Ada
       - name: ⚡ Pulihkan Cache Bersatu (Pip & Hugging Face GGUF)
         id: pipeline-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/pip
